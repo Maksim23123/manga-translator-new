@@ -1,0 +1,23 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		// Ensure Pylance/IntelliSense resolves imports from ./app
+		"python.analysis.extraPaths": [
+			"./app"
+		],
+		// Load environment variables from .env (PYTHONPATH)
+		"python.envFile": "${workspaceFolder}/.env",
+		// Also propagate to integrated terminal on Windows
+		"terminal.integrated.env.windows": {
+			"PYTHONPATH": "${workspaceFolder}/app"
+		},
+		"cSpell.words": [
+			"Doesnt",
+			"mtmeta"
+		]
+	}
+}
