@@ -8,8 +8,6 @@ class LoadProject:
         self.project_slot, self.project_repository = project_slot, project_repository
     
     
-    def execute(self, req: LoadProjectRequest) -> str:
-        if project_data := self.project_slot.get_data():
-            return self.project_repository.save(req.uri, project_data)
-        else:
-            raise InvalidProjectDataError("Project slot is empty")
+    def execute(self, req: LoadProjectRequest):
+        project_data = self.project_repository.load(req.uri)
+        self.project_slot.set_data(project_data)
