@@ -1,4 +1,4 @@
-from ..ports import ProjectRepository, CurrentProjectStore, IdGenerator
+from ..ports import CurrentProjectStore, IdGenerator
 from ..dto import CreateProjectRequest
 from domain.project.value_objects import ProjectID, ProjectData, ProjectName
 

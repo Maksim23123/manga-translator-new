@@ -18,9 +18,13 @@ class ProjectOverwriteError(Exception):
     DEFAULT_MSG = "Trying to save on project on top of another."
     
     def __init__(self, msg: Optional[str] = None) -> None:
-        final_message = msg if msg else self.DEFAULT_MSG
+        final_message = msg or self.DEFAULT_MSG
         super().__init__(final_message)
 
 
 class InvalidPathError(Exception):
     """Raised when invalid path was passed."""
+    
+
+class InvalidProjectDataError(Exception):
+    """Raised when received project data is invalid."""

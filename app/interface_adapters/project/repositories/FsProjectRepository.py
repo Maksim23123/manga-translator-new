@@ -48,13 +48,13 @@ class FsProjectRepository(ProjectRepository):
     
     
     def _atomic_write_json(self, file_path: Path, project_data: ProjectData):
-        if file_path.exists() and file_path.is_file():
+        if file_path.is_file():
             project_data_in_file = self._read_from_file(file_path)
             if project_data_in_file.project_id != project_data.project_id:
                 raise ProjectIdMismatchError(f"Existing id {project_data_in_file.project_id} != incoming {project_data.project_id}")
-        
+
         project_data_dict = to_dict(project_data)
-        tmp = file_path.with_suffix(file_path.suffix + ".tmp")
+        tmp = file_path.with_suffix(f"{file_path.suffix}.tmp")
         tmp.write_text(json.dumps(project_data_dict, ensure_ascii=False, indent=2),encoding="utf-8")
         tmp.replace(file_path)
         return str(file_path)
