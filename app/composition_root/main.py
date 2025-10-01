@@ -1,4 +1,4 @@
-from interface_adapters.project.repositories.FsProjectRepository import FsProjectRepository
+from interface_adapters.project.repositories.fs_project_repository import FsProjectRepository
 from domain.project.services import new_project
 
 
