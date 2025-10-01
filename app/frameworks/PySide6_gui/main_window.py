@@ -1,4 +1,4 @@
-from PySide6.QtWidgets import QMainWindow, QWidget, QMenuBar, QMenu, QInputDialog
+from PySide6.QtWidgets import QMainWindow, QWidget, QMenuBar, QMenu, QInputDialog, QFileDialog
 from PySide6.QtGui import QAction
 from typing import Optional
 
@@ -34,6 +34,7 @@ class MainWindow(QMainWindow):
         new_project_action = QAction(parent=main_menu, text="New Project")
         new_project_action.triggered.connect(self._controller.on_new_project_triggered)
         save_project_action = QAction(parent=main_menu, text="Save")
+        save_project_action.triggered.connect(self._controller.on_save_project_triggered)
         load_project_action = QAction(parent=main_menu, text="Load")
         
         main_menu.addActions([
@@ -51,4 +52,11 @@ class MainWindow(QMainWindow):
         text, ok = QInputDialog.getText(self, "New Project", "Project name:")
         return text if ok else None
         
-        
+    
+    def prompt_location_for_new_project(self):
+        location = QFileDialog.getExistingDirectory(
+            parent=self,
+            caption="Select a folder",
+            dir="../"
+        )
+        return location if location else None

@@ -13,13 +13,16 @@ from interface_adapters.project.util.idgen_uuid import UUIDGenerator
 def build_main_window() -> MainWindow:
     id_generator = UUIDGenerator()
     mem_current_project_store = MemCurrentProjectStore()
+    fs_project_repository = FsProjectRepository()
     
     create_project_use_case = CreateProject(mem_current_project_store, id_generator)
+    save_project_use_case = SaveProject(mem_current_project_store, fs_project_repository)
     
     presenter = MainWindowPresenter()
     controller = MainWindowController(
         presenter,
-        create_project_use_case
+        create_project_use_case,
+        save_project_use_case
         )
     return MainWindow(presenter, controller)
      
