@@ -17,12 +17,14 @@ def build_main_window() -> MainWindow:
     
     create_project_use_case = CreateProject(mem_current_project_store, id_generator)
     save_project_use_case = SaveProject(mem_current_project_store, fs_project_repository)
+    load_project_use_case = LoadProject(mem_current_project_store, fs_project_repository)
     
     presenter = MainWindowPresenter()
     controller = MainWindowController(
         presenter,
         create_project_use_case,
-        save_project_use_case
+        save_project_use_case,
+        load_project_use_case
         )
     return MainWindow(presenter, controller)
      

@@ -36,6 +36,7 @@ class MainWindow(QMainWindow):
         save_project_action = QAction(parent=main_menu, text="Save")
         save_project_action.triggered.connect(self._controller.on_save_project_triggered)
         load_project_action = QAction(parent=main_menu, text="Load")
+        load_project_action.triggered.connect(self._controller.on_load_project_triggered)
         
         main_menu.addActions([
             new_project_action,
@@ -53,10 +54,19 @@ class MainWindow(QMainWindow):
         return text if ok else None
         
     
-    def prompt_location_for_new_project(self):
+    def prompt_location_for_new_project(self) -> Optional[str]:
         location = QFileDialog.getExistingDirectory(
             parent=self,
             caption="Select a folder",
             dir="../"
         )
-        return location if location else None
+        return location or None
+    
+    
+    def prompt_existing_project_location(self) -> Optional[str]:
+        location, _ = QFileDialog.getOpenFileName(
+            parent=self,
+            caption="Select project file",
+            dir="../"
+        )
+        return location or None

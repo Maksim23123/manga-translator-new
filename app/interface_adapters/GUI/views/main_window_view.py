@@ -8,3 +8,6 @@ class MainWindowView(Protocol):
     
     
     def prompt_location_for_new_project(self) -> Optional[str]: ...
+    
+    
+    def prompt_existing_project_location(self) -> Optional[str]: ...

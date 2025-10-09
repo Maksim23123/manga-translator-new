@@ -21,12 +21,12 @@ CONFIG = {
     "handlers": {
         "console": {
             "class": "logging.StreamHandler",
-            "level": "INFO",
+            "level": "DEBUG",
             "formatter": "console_fmt",
         },
         "file_rotating": {
             "class": "logging.handlers.RotatingFileHandler",
-            "level": "DEBUG",
+            "level": "INFO",
             "formatter": "file_fmt",
             "filename": str(LOG_DIR / "app.log"),
             "maxBytes": 2_000_000,   # ~2MB per file

@@ -17,5 +17,9 @@ class MainWindowPresenter:
         return self.view.prompt_project_name() if self.view else None
 
     
-    def request_location_uri(self) -> Optional[str]:
+    def request_save_location_uri(self) -> Optional[str]:
         return self.view.prompt_location_for_new_project() if self.view else None
+
+    
+    def request_load_location_uri(self) -> Optional[str]:
+        return self.view.prompt_existing_project_location() if self.view else None
