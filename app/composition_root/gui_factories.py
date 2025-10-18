@@ -1,13 +1,13 @@
-from interface_adapters.GUI.presenters.main_window_presenter import MainWindowPresenter
-from interface_adapters.GUI.controllers.main_window_controller import MainWindowController
-from frameworks.PySide6_gui.main_window import MainWindow
-from application.project.use_cases.create_project import CreateProject
-from application.project.use_cases.save_project import SaveProject
-from application.project.use_cases.load_project import LoadProject
+from app.interface_adapters.gui.presenters.main_window_presenter import MainWindowPresenter
+from app.interface_adapters.gui.controllers.main_window_controller import MainWindowController
+from app.frameworks.pyside6_gui.main_window import MainWindow
+from app.application.project.use_cases.create_project import CreateProject
+from app.application.project.use_cases.save_project import SaveProject
+from app.application.project.use_cases.load_project import LoadProject
 
-from interface_adapters.project.repositories.mem_current_project_store import MemCurrentProjectStore
-from interface_adapters.project.repositories.fs_project_repository import FsProjectRepository
-from interface_adapters.project.util.idgen_uuid import UUIDGenerator
+from app.interface_adapters.project.repositories.mem_current_project_store import MemCurrentProjectStore
+from app.interface_adapters.project.repositories.fs_project_repository import FsProjectRepository
+from app.interface_adapters.project.util.idgen_uuid import UUIDGenerator
 
 
 def build_main_window() -> MainWindow:

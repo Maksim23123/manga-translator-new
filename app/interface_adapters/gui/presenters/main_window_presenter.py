@@ -3,23 +3,18 @@ from typing import Optional
 from ..views.main_window_view import MainWindowView
 
 
-
 class MainWindowPresenter:
-    
+
     view: Optional[MainWindowView] = None
-    
-    
+
     def attach_view(self, view: MainWindowView):
         self.view = view
-    
-    
+
     def request_project_name(self) -> Optional[str]:
         return self.view.prompt_project_name() if self.view else None
 
-    
-    def request_save_location_uri(self) -> Optional[str]:
+    def request_save_location_path(self) -> Optional[str]:
         return self.view.prompt_location_for_new_project() if self.view else None
 
-    
-    def request_load_location_uri(self) -> Optional[str]:
+    def request_load_location_path(self) -> Optional[str]:
         return self.view.prompt_existing_project_location() if self.view else None

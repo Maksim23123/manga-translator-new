@@ -1,11 +1,10 @@
 from typing import Protocol, Optional
-from domain.project.value_objects import ProjectData
-
+from app.domain.project.value_objects import ProjectData
 
 
 class IdGenerator(Protocol):
     def generate(self) -> str: ...
-    
+
 
 class CurrentProjectStore(Protocol):
     def get_data(self) -> Optional[ProjectData]: ...
@@ -13,5 +12,5 @@ class CurrentProjectStore(Protocol):
 
 
 class ProjectRepository(Protocol):
-    def load(self, uri: str) -> ProjectData: ...
-    def save(self, uri:str, project_data: ProjectData) -> str: ...
+    def load(self, path: str) -> ProjectData: ...
+    def save(self, path: str, project_data: ProjectData) -> str: ...

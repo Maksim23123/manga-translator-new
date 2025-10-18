@@ -1,6 +1,6 @@
 import uuid
-from application.project.ports import IdGenerator
 
+from app.application.project.ports import IdGenerator
 
 
 class UUIDGenerator(IdGenerator):

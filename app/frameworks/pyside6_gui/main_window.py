@@ -2,10 +2,9 @@ from PySide6.QtWidgets import QMainWindow, QWidget, QMenuBar, QMenu, QInputDialo
 from PySide6.QtGui import QAction
 from typing import Optional
 
-from .project_creation_dialog import ProjectCreationDialog
-from interface_adapters.GUI.presenters.main_window_presenter import MainWindowPresenter
-from interface_adapters.GUI.controllers.main_window_controller import MainWindowController
-from interface_adapters.GUI.views.main_window_view import MainWindowView
+from app.interface_adapters.gui.presenters.main_window_presenter import MainWindowPresenter
+from app.interface_adapters.gui.controllers.main_window_controller import MainWindowController
+from app.interface_adapters.gui.views.main_window_view import MainWindowView
 
 
 class MainWindow(QMainWindow):
