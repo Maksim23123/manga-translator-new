@@ -1,9 +1,18 @@
-from PySide6.QtWidgets import QMainWindow, QWidget, QMenuBar, QMenu, QInputDialog, QFileDialog
+from PySide6.QtWidgets import (
+    QFileDialog,
+    QInputDialog,
+    QMainWindow,
+    QMenu,
+    QMenuBar,
+    QTabWidget,
+    QWidget,
+)
 from PySide6.QtGui import QAction
-from typing import Optional
+from typing import Optional, Sequence
 
 from app.interface_adapters.gui.presenters.main_window_presenter import MainWindowPresenter
 from app.interface_adapters.gui.controllers.main_window_controller import MainWindowController
+from app.frameworks.pyside6_gui.tabs.tab import Tab
 
 
 
@@ -16,14 +25,21 @@ class MainWindow(QMainWindow):
         
         self._presenter = presenter
         self._controller = controller
+        self._tab_widget: Optional[QTabWidget] = None
         
         self._presenter.attach_view(self)
         self._init_elements()
     
     
     def _init_elements(self):
+        self._init_tab_widget()
         self._init_menu_bar()
-        
+    
+    
+    def _init_tab_widget(self):
+        self._tab_widget = QTabWidget(self)
+        self.setCentralWidget(self._tab_widget)
+    
     
     def _init_menu_bar(self):
         menu_bar = QMenuBar(self)
@@ -69,3 +85,12 @@ class MainWindow(QMainWindow):
             dir="../"
         )
         return location or None
+
+
+    def connect_tabs(self, tabs: Sequence[Tab]) -> None:
+        if self._tab_widget is None:
+            raise RuntimeError("Tab widget is not initialized.")
+        
+        self._tab_widget.clear()
+        for tab in tabs:
+            self._tab_widget.addTab(tab, tab.tab_name)

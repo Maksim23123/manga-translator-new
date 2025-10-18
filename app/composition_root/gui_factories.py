@@ -1,6 +1,7 @@
 from app.interface_adapters.gui.presenters.main_window_presenter import MainWindowPresenter
 from app.interface_adapters.gui.controllers.main_window_controller import MainWindowController
 from app.frameworks.pyside6_gui.main_window import MainWindow
+from app.frameworks.pyside6_gui.tabs.test_tab import TestTab
 from app.application.project.use_cases.create_project import CreateProject
 from app.application.project.use_cases.save_project import SaveProject
 from app.application.project.use_cases.load_project import LoadProject
@@ -26,5 +27,7 @@ def build_main_window() -> MainWindow:
         save_project_use_case,
         load_project_use_case
         )
-    return MainWindow(presenter, controller)
+    main_window = MainWindow(presenter, controller)
+    main_window.connect_tabs([TestTab()])
+    return main_window
      
