@@ -4,7 +4,7 @@ from typing import Optional
 
 from app.interface_adapters.gui.presenters.main_window_presenter import MainWindowPresenter
 from app.interface_adapters.gui.controllers.main_window_controller import MainWindowController
-from app.interface_adapters.gui.views.main_window_view import MainWindowView
+
 
 
 class MainWindow(QMainWindow):
