@@ -1,4 +1,5 @@
 import logging
+from typing import Callable, Optional, Sequence
 
 from app.application.project.use_cases.create_project import CreateProject
 from app.application.project.use_cases.save_project import SaveProject
@@ -21,16 +22,19 @@ class MainWindowController:
         create_project_use_case: CreateProject,
         save_project_use_case: SaveProject,
         load_project_use_case: LoadProject,
+        project_ready_callbacks: Optional[Sequence[Callable[[], None]]] = None,
     ) -> None:
         self._presenter = presenter
         self._create_project_use_case = create_project_use_case
         self._save_project_use_case = save_project_use_case
         self._load_project_use_case = load_project_use_case
+        self._project_ready_callbacks = list(project_ready_callbacks or [])
 
     def on_new_project_triggered(self) -> None:
         if project_name := self._presenter.request_project_name():
             req = CreateProjectRequest(project_name)
             self._create_project_use_case.execute(req)
+            self._notify_project_ready()
             log.info(f"Project created. Project name: {project_name}")
 
     def on_save_project_triggered(self) -> None:
@@ -47,7 +51,15 @@ class MainWindowController:
             try:
                 req = LoadProjectRequest(load_location)
                 self._load_project_use_case.execute(req)
+                self._notify_project_ready()
                 log.info("Project loaded")
             except Exception as ex:
                 log.error(ex)
         log.debug("Load project triggered")
+
+    def _notify_project_ready(self) -> None:
+        for callback in self._project_ready_callbacks:
+            try:
+                callback()
+            except Exception as ex:
+                log.exception("Project ready callback failed: %s", ex)

@@ -1,6 +1,6 @@
 from ..ports import CurrentProjectStore, IdGenerator
 from ..dto import CreateProjectRequest
-from app.domain.project.value_objects import ProjectID, ProjectData, ProjectName
+from app.domain.project.services import new_project
 
 
 class CreateProject:
@@ -8,10 +8,5 @@ class CreateProject:
         self.project_slot, self.ids = project_slot, ids
 
     def execute(self, req: CreateProjectRequest):
-        project_id = ProjectID(self.ids.generate())
-        project_name = ProjectName(req.project_name)
-        project_data = ProjectData(
-            project_id,
-            project_name,
-        )
+        project_data = new_project(self.ids.generate(), req.project_name)
         self.project_slot.set_data(project_data)

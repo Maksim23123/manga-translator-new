@@ -16,3 +16,8 @@ class Tab(QMainWindow):
 
     def set_tab_name(self, name: str) -> None:
         self._tab_name = name
+        parent = self.parentWidget()
+        if parent is not None and hasattr(parent, "indexOf") and hasattr(parent, "setTabText"):
+            index = parent.indexOf(self)  # type: ignore[attr-defined]
+            if index != -1:
+                parent.setTabText(index, name)  # type: ignore[attr-defined]
