@@ -51,8 +51,11 @@ class DocUnitTab(Tab):
         self._unit_items: Dict[str, Tuple[QListWidgetItem, UnitListItem]] = {}
         self._is_dirty = False
         self._view_attached = False
+        self._details_current_unit_id: Optional[str] = None
+        self._details_original_name: Optional[str] = None
 
         self._setup_connections()
+        self._update_details_actions_state()
 
     # region View interface implementation
     def display_units(self, units: List[DocUnitViewModel]) -> None:
@@ -68,6 +71,7 @@ class DocUnitTab(Tab):
             self._select_unit_item(unit_id)
         elif unit_id is None:
             self._details_view.switch_display_mode(self._details_view.NONE_SELECTED_DISPLAY_MODE)
+            self._reset_details_state()
 
     def _select_unit_item(self, unit_id: str) -> None:
         item, _ = self._unit_items[unit_id]
@@ -93,6 +97,7 @@ class DocUnitTab(Tab):
             self._view_attached = True
         else:
             self._presenter.refresh()
+        self._update_details_actions_state()
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
         if self._view_attached:
@@ -105,6 +110,12 @@ class DocUnitTab(Tab):
         self.ui.importFilesPushButton.clicked.connect(self._handle_import_assets)
         self.ui.unitListWidget.itemSelectionChanged.connect(self._handle_selection_changed)
         self.ui.unitListWidget.itemDoubleClicked.connect(self._handle_rename_requested)
+        details_widget = self._details_view.unit_details_widget
+        details_widget.save_changes_pushButton.clicked.connect(self._handle_save_details)
+        details_widget.discard_changes_pushButton.clicked.connect(self._handle_discard_details)
+        details_widget.unit_name_lineEdit.textChanged.connect(
+            lambda _: self._update_details_actions_state()
+        )
 
     def _add_unit_item(self, view_model: DocUnitViewModel, selected: bool) -> None:
         list_widget: QListWidget = self.ui.unitListWidget
@@ -187,15 +198,79 @@ class DocUnitTab(Tab):
     def _display_unit_details(self, unit_id: str) -> None:
         if unit_id not in self._unit_items:
             self._details_view.switch_display_mode(self._details_view.NONE_SELECTED_DISPLAY_MODE)
+            self._reset_details_state()
             return
         _, widget = self._unit_items[unit_id]
         self._details_view.switch_display_mode(self._details_view.UNIT_DISPLAY_MODE)
         details_widget = self._details_view.unit_details_widget
+        self._details_current_unit_id = unit_id
+        self._details_original_name = widget.unit.name
+        details_widget.unit_name_lineEdit.blockSignals(True)
         details_widget.unit_name_lineEdit.setText(widget.unit.name)
+        details_widget.unit_name_lineEdit.blockSignals(False)
         details_widget.unit_path_lineEdit.setText("")
+        self._update_details_actions_state()
 
     def _current_selection(self) -> Optional[str]:
         list_widget: QListWidget = self.ui.unitListWidget
         if current := list_widget.currentItem():
             return current.data(Qt.ItemDataRole.UserRole)
         return None
+
+    def _handle_save_details(self) -> None:
+        if not self._details_current_unit_id:
+            return
+        details_widget = self._details_view.unit_details_widget
+        new_name = details_widget.unit_name_lineEdit.text().strip()
+        if not new_name:
+            self.show_error("Doc unit name must not be empty.")
+            details_widget.unit_name_lineEdit.blockSignals(True)
+            details_widget.unit_name_lineEdit.setText(self._details_original_name or "")
+            details_widget.unit_name_lineEdit.blockSignals(False)
+            self._update_details_actions_state()
+            return
+        if self._details_original_name and new_name == self._details_original_name:
+            self._update_details_actions_state()
+            return
+        try:
+            self._controller.rename_doc_unit(self._details_current_unit_id, new_name)
+            self._details_original_name = new_name
+            details_widget.unit_name_lineEdit.blockSignals(True)
+            details_widget.unit_name_lineEdit.setText(new_name)
+            details_widget.unit_name_lineEdit.blockSignals(False)
+        except Exception as exc:
+            self.show_error(str(exc))
+            details_widget.unit_name_lineEdit.blockSignals(True)
+            details_widget.unit_name_lineEdit.setText(self._details_original_name or "")
+            details_widget.unit_name_lineEdit.blockSignals(False)
+        finally:
+            self._update_details_actions_state()
+
+    def _handle_discard_details(self) -> None:
+        if not self._details_current_unit_id:
+            return
+        details_widget = self._details_view.unit_details_widget
+        details_widget.unit_name_lineEdit.blockSignals(True)
+        details_widget.unit_name_lineEdit.setText(self._details_original_name or "")
+        details_widget.unit_name_lineEdit.blockSignals(False)
+        self._update_details_actions_state()
+
+    def _update_details_actions_state(self) -> None:
+        details_widget = self._details_view.unit_details_widget
+        has_selection = self._details_current_unit_id is not None
+        current_text = details_widget.unit_name_lineEdit.text().strip()
+        original = (self._details_original_name or "").strip() if self._details_original_name else ""
+        has_changes = has_selection and current_text != original
+        can_save = has_changes and bool(current_text)
+        details_widget.save_changes_pushButton.setEnabled(can_save)
+        details_widget.discard_changes_pushButton.setEnabled(has_changes)
+
+    def _reset_details_state(self) -> None:
+        self._details_current_unit_id = None
+        self._details_original_name = None
+        details_widget = self._details_view.unit_details_widget
+        details_widget.unit_name_lineEdit.blockSignals(True)
+        details_widget.unit_name_lineEdit.setText("")
+        details_widget.unit_name_lineEdit.blockSignals(False)
+        details_widget.unit_path_lineEdit.setText("")
+        self._update_details_actions_state()
