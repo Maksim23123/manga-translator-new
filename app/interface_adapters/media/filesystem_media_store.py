@@ -71,6 +71,36 @@ class FileSystemMediaStore(MediaStore):
             raise ValueError("Pointer has no path hint to resolve.")
         return str(project_root.joinpath(pointer.path_hint))
 
+    def list_final_assets(self) -> list[str]:
+        project_root = self._require_project_root()
+        final_dir = project_root.joinpath(self.FINAL_DIR)
+        if not final_dir.exists():
+            return []
+        assets: list[str] = []
+        for child in final_dir.rglob("*"):
+            if child.is_file():
+                assets.append(child.relative_to(project_root).as_posix())
+        return assets
+
+    def delete_asset(self, path_hint: str) -> None:
+        project_root = self._require_project_root()
+        target = project_root.joinpath(path_hint)
+        try:
+            target.relative_to(project_root.joinpath(self.FINAL_DIR))
+        except ValueError:
+            raise ValueError("Cannot delete asset outside final directory") from None
+        if target.exists():
+            target.unlink()
+            self._prune_empty_parents(target.parent, project_root.joinpath(self.FINAL_DIR))
+        else:
+            return
+
+    def cleanup_temp(self) -> None:
+        project_root = self._require_project_root()
+        temp_dir = project_root.joinpath(self.TEMP_DIR)
+        if temp_dir.exists():
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
     def _require_project_root(self) -> Path:
         project_data = self._project_store.get_data()
         if not project_data:
@@ -79,3 +109,13 @@ class FileSystemMediaStore(MediaStore):
         if not root:
             raise RuntimeError("Project metadata missing 'project_root_path'.")
         return Path(root)
+
+    def _prune_empty_parents(self, path: Path, stop: Path) -> None:
+        while path != stop and path.is_dir():
+            try:
+                path.rmdir()
+            except OSError:
+                break
+            path = path.parent
+
+

@@ -2,6 +2,7 @@ from app.application.project.use_cases.create_project import CreateProject
 from app.application.project.use_cases.load_project import LoadProject
 from app.application.project.use_cases.save_project import SaveProject
 from app.composition_root.gui_factories.doc_units.tab_factory import (
+    DocUnitTabBundle,
     build_doc_unit_tab,
 )
 from app.frameworks.pyside6_gui.main_window import MainWindow
@@ -27,10 +28,11 @@ def build_main_window() -> MainWindow:
     fs_project_repository = FsProjectRepository()
     project_settings_store = QtProjectSettingsStore()
 
-    doc_unit_tab = build_doc_unit_tab(
+    doc_unit_bundle: DocUnitTabBundle = build_doc_unit_tab(
         project_store=mem_current_project_store,
         id_generator=id_generator,
     )
+    doc_unit_tab = doc_unit_bundle.tab
 
     create_project_use_case = CreateProject(mem_current_project_store, id_generator)
     save_project_use_case = SaveProject(
@@ -51,6 +53,7 @@ def build_main_window() -> MainWindow:
         save_project_use_case,
         load_project_use_case,
         project_settings_store,
+        finalize_doc_unit_assets=doc_unit_bundle.finalize_assets,
         project_ready_callbacks=[doc_unit_tab.on_project_available],
     )
 

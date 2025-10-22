@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from app.application.doc_units.events import DocUnitEventBus
 from app.application.doc_units.use_cases.create_doc_unit import CreateDocUnit
 from app.application.doc_units.use_cases.delete_doc_unit import DeleteDocUnit
@@ -18,6 +20,9 @@ from app.application.doc_units.use_cases.hierarchy import (
     MoveHierarchyNodes,
     RenameHierarchyNode,
     SelectHierarchyNode,
+)
+from app.application.doc_units.use_cases.finalize_doc_unit_assets import (
+    FinalizeDocUnitAssets,
 )
 from app.application.doc_units.ports import ActiveDocUnitStore
 from app.application.project.ports import CurrentProjectStore, IdGenerator
@@ -48,11 +53,17 @@ from app.interface_adapters.media.filesystem_media_store import (
 )
 
 
+@dataclass(slots=True)
+class DocUnitTabBundle:
+    tab: DocUnitTab
+    finalize_assets: FinalizeDocUnitAssets
+
+
 def build_doc_unit_tab(
     project_store: CurrentProjectStore,
     id_generator: IdGenerator,
     active_store: ActiveDocUnitStore | None = None,
-) -> DocUnitTab:
+) -> DocUnitTabBundle:
     doc_unit_repository = ProjectDocUnitRepository(project_store)
     active_doc_unit_store = active_store or MemActiveDocUnitStore()
     event_bus = DocUnitEventBus()
@@ -137,10 +148,21 @@ def build_doc_unit_tab(
         select_use_case=select_node_use_case,
     )
 
-    return DocUnitTab(
+    finalize_assets_use_case = FinalizeDocUnitAssets(
+        repository=doc_unit_repository,
+        media_store=media_store,
+        events=event_bus,
+    )
+
+    tab = DocUnitTab(
         presenter=presenter,
         controller=controller,
         hierarchy_presenter=hierarchy_presenter,
         hierarchy_controller=hierarchy_controller,
         hierarchy_details_presenter=hierarchy_details_presenter,
+    )
+
+    return DocUnitTabBundle(
+        tab=tab,
+        finalize_assets=finalize_assets_use_case,
     )

@@ -1,6 +1,9 @@
 import logging
 from typing import Callable, Optional, Sequence
 
+from app.application.doc_units.use_cases.finalize_doc_unit_assets import (
+    FinalizeDocUnitAssets,
+)
 from app.application.project.use_cases.create_project import CreateProject
 from app.application.project.use_cases.save_project import SaveProject
 from app.application.project.use_cases.load_project import LoadProject
@@ -25,6 +28,7 @@ class MainWindowController:
         save_project_use_case: SaveProject,
         load_project_use_case: LoadProject,
         project_settings_store: ProjectSettingsStore,
+        finalize_doc_unit_assets: FinalizeDocUnitAssets | None = None,
         project_ready_callbacks: Optional[Sequence[Callable[[], None]]] = None,
     ) -> None:
         self._presenter = presenter
@@ -33,6 +37,7 @@ class MainWindowController:
         self._load_project_use_case = load_project_use_case
         self._project_settings_store = project_settings_store
         self._project_ready_callbacks = list(project_ready_callbacks or [])
+        self._finalize_doc_unit_assets = finalize_doc_unit_assets
 
     def on_new_project_triggered(self) -> None:
         if project_name := self._presenter.request_project_name():
@@ -85,6 +90,9 @@ class MainWindowController:
 
     def _attempt_save(self, save_path: Optional[str]) -> bool:
         try:
+            if self._finalize_doc_unit_assets:
+                self._finalize_doc_unit_assets.execute()
+
             req = SaveProjectRequest(save_path)
             response = self._save_project_use_case.execute(req)
             log.info(f"Project saved to: {response.access_path}")
