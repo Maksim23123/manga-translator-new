@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Dict, List, Optional, Tuple
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QFileDialog,
     QInputDialog,
@@ -13,6 +14,7 @@ from PySide6.QtWidgets import (
 )
 
 from app.frameworks.pyside6_gui.tabs.tab import Tab
+from app.domain.doc_units.entities import HierarchyNode
 from app.interface_adapters.doc_units.controllers.doc_unit_controller import (
     DocUnitController,
 )
@@ -26,6 +28,11 @@ from app.interface_adapters.doc_units.presenters.doc_unit_presenter import (
 )
 from app.interface_adapters.doc_units.presenters.hierarchy_presenter import (
     HierarchyPresenter,
+)
+from app.interface_adapters.doc_units.presenters.hierarchy_details_presenter import (
+    HierarchyDetailsPresenter,
+    HierarchyDetailsView,
+    HierarchyDetailsViewModel,
 )
 
 from .details_view.details_view import DetailsView
@@ -43,6 +50,7 @@ class DocUnitTab(Tab):
         controller: DocUnitController,
         hierarchy_presenter: HierarchyPresenter,
         hierarchy_controller: HierarchyController,
+        hierarchy_details_presenter: HierarchyDetailsPresenter,
         parent: Optional[QMainWindow] = None,
     ) -> None:
         super().__init__(parent)
@@ -50,6 +58,7 @@ class DocUnitTab(Tab):
 
         self._presenter = presenter
         self._controller = controller
+        self._hierarchy_details_presenter = hierarchy_details_presenter
 
         self.ui = Ui_UnitComposer()
         self.ui.setupUi(self)
@@ -67,6 +76,7 @@ class DocUnitTab(Tab):
         self._view_attached = False
         self._details_current_unit_id: Optional[str] = None
         self._details_original_name: Optional[str] = None
+        self._hierarchy_details_attached = False
 
         self._setup_connections()
         self._update_details_actions_state()
@@ -105,18 +115,76 @@ class DocUnitTab(Tab):
 
     # endregion
 
+    # HierarchyDetailsView implementation
+    def show_hierarchy_item(self, view_model: HierarchyDetailsViewModel) -> None:
+        widget = self._details_view.hierarchy_item_details_widget
+        widget.item_name_lineEdit.setText(view_model.name)
+        widget.item_type_lineEdit.setText(view_model.node_type)
+
+        widget.children_number_widget.hide()
+        widget.image_path_widget.hide()
+        widget.image_preview_label.hide()
+        widget.image_preview_label.clear()
+
+        if view_model.node_type == HierarchyNode.FOLDER_TYPE:
+            widget.children_number_widget.show()
+            widget.children_number_lineEdit.setText(str(view_model.children_count or 0))
+        else:
+            image_path = view_model.image_path or ""
+            widget.image_path_widget.show()
+            widget.image_path_lineEdit.setText(image_path)
+            if image_path:
+                pixmap = QPixmap(image_path)
+                if not pixmap.isNull():
+                    image_width = pixmap.width()
+                    image_height = pixmap.height() or 1
+                    preview_height = max(1, int(self._details_view.width() * 0.4))
+                    ratio = image_width / image_height
+                    preview_width = max(1, int(preview_height * ratio))
+                    widget.image_preview_label.setFixedSize(preview_width, preview_height)
+                    widget.image_preview_label.setPixmap(pixmap)
+                    widget.image_preview_label.setScaledContents(True)
+                    widget.image_preview_label.show()
+                else:
+                    widget.image_preview_label.setText("Preview unavailable")
+                    widget.image_preview_label.show()
+            else:
+                widget.image_preview_label.setText("Preview unavailable")
+                widget.image_preview_label.show()
+
+        self._details_view.switch_display_mode(self._details_view.HIERARCHY_ITEM_DISPLAY_MODE)
+
+    def show_no_selection(self) -> None:
+        widget = self._details_view.hierarchy_item_details_widget
+        widget.item_name_lineEdit.clear()
+        widget.item_type_lineEdit.clear()
+        widget.children_number_lineEdit.clear()
+        widget.image_path_lineEdit.clear()
+        widget.image_preview_label.clear()
+        widget.image_preview_label.hide()
+        widget.image_path_widget.hide()
+        widget.children_number_widget.hide()
+        if not self._details_view.unit_details_widget.isVisible():
+            self._details_view.switch_display_mode(self._details_view.NONE_SELECTED_DISPLAY_MODE)
+
     def on_project_available(self) -> None:
         if not self._view_attached:
             self._presenter.attach_view(self)
             self._view_attached = True
         else:
             self._presenter.refresh()
+        if not self._hierarchy_details_attached:
+            self._hierarchy_details_presenter.attach_view(self)
+            self._hierarchy_details_attached = True
         self._update_details_actions_state()
 
     def closeEvent(self, event) -> None:  # type: ignore[override]
         if self._view_attached:
             self._presenter.detach_view()
             self._view_attached = False
+        if self._hierarchy_details_attached:
+            self._hierarchy_details_presenter.detach_view()
+            self._hierarchy_details_attached = False
         self._hierarchy_dock.dispose()
         super().closeEvent(event)
 

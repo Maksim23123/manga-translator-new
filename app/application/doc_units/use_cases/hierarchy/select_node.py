@@ -22,15 +22,24 @@ class SelectHierarchyNode:
         if unit_id is None:
             raise RuntimeError("No active doc unit.")
 
-        if request.node_id:
-            root = self._repository.get_hierarchy(unit_id)
-            node_map = collect_node_map(root)
-            if request.node_id not in node_map:
-                raise KeyError(f"Hierarchy node '{request.node_id}' not found.")
+        root = self._repository.get_hierarchy(unit_id)
+        node_map = collect_node_map(root)
+
+        selected_ids = list(dict.fromkeys(request.selected_node_ids))
+        for node_id in selected_ids:
+            if node_id not in node_map:
+                raise KeyError(f"Hierarchy node '{node_id}' not found.")
+
+        primary_node_id = request.primary_node_id
+        if primary_node_id and primary_node_id not in node_map:
+            raise KeyError(f"Hierarchy node '{primary_node_id}' not found.")
+        if primary_node_id and primary_node_id not in selected_ids:
+            selected_ids.insert(0, primary_node_id)
 
         self._events.publish(
             HierarchySelectionChanged(
                 unit_id=unit_id.value,
-                node_id=request.node_id,
+                primary_node_id=primary_node_id,
+                selected_node_ids=selected_ids,
             )
         )

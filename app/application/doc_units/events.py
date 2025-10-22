@@ -38,7 +38,8 @@ class HierarchyUpdated:
 @dataclass(slots=True)
 class HierarchySelectionChanged:
     unit_id: str
-    node_id: Optional[str]
+    primary_node_id: Optional[str]
+    selected_node_ids: List[str]
 
 
 EventT = TypeVar("EventT")

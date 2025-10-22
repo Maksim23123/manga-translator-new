@@ -75,5 +75,10 @@ class HierarchyController:
             )
         )
 
-    def select_node(self, node_id: Optional[str]):
-        self._select_use_case.execute(SelectHierarchyNodeRequest(node_id=node_id))
+    def select_node(self, primary_node_id: Optional[str], selected_node_ids: Iterable[str]):
+        self._select_use_case.execute(
+            SelectHierarchyNodeRequest(
+                primary_node_id=primary_node_id,
+                selected_node_ids=list(dict.fromkeys(selected_node_ids)),
+            )
+        )

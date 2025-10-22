@@ -33,7 +33,7 @@ class ImportDocUnitAsset:
         pointer = self._media_store.import_temp(request.source_path)
 
         node_id = self._ids.generate()
-        name_hint = Path(pointer.path_hint or request.source_path).stem
+        name_hint = Path(request.source_path).stem
         new_node = HierarchyNode(
             node_id=node_id,
             name=name_hint,

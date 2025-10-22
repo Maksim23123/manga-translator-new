@@ -175,11 +175,8 @@ class HierarchyDock(HierarchyView):
                 selected_ids.append(node.node_id)
 
         current_index = self._tree_view.currentIndex()
-        primary_node_id: Optional[str] = None
-        if current_index.isValid() and selection_model.isSelected(current_index):
-            current_node = self._model.node_from_index(current_index)
-            if current_node:
-                primary_node_id = current_node.node_id
+        current_node = self._model.node_from_index(current_index)
+        primary_node_id = current_node.node_id if current_node else None
         if primary_node_id and primary_node_id not in selected_ids:
             selected_ids.insert(0, primary_node_id)
         if not primary_node_id and selected_ids:

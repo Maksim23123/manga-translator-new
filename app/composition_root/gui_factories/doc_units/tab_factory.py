@@ -34,6 +34,9 @@ from app.interface_adapters.doc_units.presenters.doc_unit_presenter import (
 from app.interface_adapters.doc_units.presenters.hierarchy_presenter import (
     HierarchyPresenter,
 )
+from app.interface_adapters.doc_units.presenters.hierarchy_details_presenter import (
+    HierarchyDetailsPresenter,
+)
 from app.interface_adapters.doc_units.repositories.project_doc_unit_repository import (
     ProjectDocUnitRepository,
 )
@@ -119,6 +122,12 @@ def build_doc_unit_tab(
         import_asset_use_case=import_use_case,
     )
     hierarchy_presenter = HierarchyPresenter(event_bus, load_hierarchy_use_case)
+    hierarchy_details_presenter = HierarchyDetailsPresenter(
+        event_bus=event_bus,
+        repository=doc_unit_repository,
+        active_store=active_doc_unit_store,
+        media_store=media_store,
+    )
     hierarchy_controller = HierarchyController(
         load_use_case=load_hierarchy_use_case,
         create_folder_use_case=create_folder_use_case,
@@ -133,4 +142,5 @@ def build_doc_unit_tab(
         controller=controller,
         hierarchy_presenter=hierarchy_presenter,
         hierarchy_controller=hierarchy_controller,
+        hierarchy_details_presenter=hierarchy_details_presenter,
     )

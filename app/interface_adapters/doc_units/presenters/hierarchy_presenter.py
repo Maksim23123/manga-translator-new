@@ -26,7 +26,7 @@ class HierarchyNodeViewModel:
 class HierarchyView(Protocol):
     def display_hierarchy(self, root: HierarchyNodeViewModel, changed_node_ids: List[str]) -> None: ...
     def clear(self) -> None: ...
-    def select_node(self, node_id: Optional[str]) -> None: ...
+    def select_nodes(self, primary_node_id: Optional[str], selected_node_ids: List[str]) -> None: ...
 
 
 class HierarchyPresenter:
@@ -85,7 +85,7 @@ class HierarchyPresenter:
         if self._active_unit_id != event.unit_id:
             return
         if self._view:
-            self._view.select_node(event.node_id)
+            self._view.select_nodes(event.primary_node_id, event.selected_node_ids)
 
     def _trigger_load(self) -> None:
         try:

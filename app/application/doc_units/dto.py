@@ -57,4 +57,5 @@ class MoveHierarchyNodesRequest:
 
 @dataclass(slots=True)
 class SelectHierarchyNodeRequest:
-    node_id: Optional[str]
+    primary_node_id: Optional[str]
+    selected_node_ids: list[str]
