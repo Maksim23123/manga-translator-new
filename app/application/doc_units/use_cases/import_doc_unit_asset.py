@@ -3,6 +3,7 @@ from pathlib import Path
 from app.application.doc_units.dto import ImportAssetRequest
 from app.application.doc_units.events import (
     DocUnitListUpdated,
+    HierarchyUpdated,
     ProjectDirtyStateChanged,
 )
 from app.application.doc_units.ports import DocUnitRepository, MediaStore
@@ -66,6 +67,13 @@ class ImportDocUnitAsset:
         units = self._repository.list_units()
         self._events.publish(
             DocUnitListUpdated([unit.unit_id.value for unit in units])
+        )
+        self._events.publish(
+            HierarchyUpdated(
+                unit_id=doc_unit.unit_id.value,
+                root=updated.hierarchy,
+                changed_node_ids=[node_id],
+            )
         )
         self._events.publish(ProjectDirtyStateChanged(True))
 

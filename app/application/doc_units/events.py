@@ -4,6 +4,8 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Callable, DefaultDict, List, Optional, Type, TypeVar
 
+from app.domain.doc_units.entities import HierarchyNode
+
 
 @dataclass(slots=True)
 class DocUnitListUpdated:
@@ -18,6 +20,25 @@ class ActiveDocUnitChanged:
 @dataclass(slots=True)
 class ProjectDirtyStateChanged:
     is_dirty: bool
+
+
+@dataclass(slots=True)
+class HierarchyLoaded:
+    unit_id: str
+    root: HierarchyNode
+
+
+@dataclass(slots=True)
+class HierarchyUpdated:
+    unit_id: str
+    root: HierarchyNode
+    changed_node_ids: List[str]
+
+
+@dataclass(slots=True)
+class HierarchySelectionChanged:
+    unit_id: str
+    node_id: Optional[str]
 
 
 EventT = TypeVar("EventT")

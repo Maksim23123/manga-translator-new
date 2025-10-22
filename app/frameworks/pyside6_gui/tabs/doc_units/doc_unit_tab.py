@@ -16,13 +16,20 @@ from app.frameworks.pyside6_gui.tabs.tab import Tab
 from app.interface_adapters.doc_units.controllers.doc_unit_controller import (
     DocUnitController,
 )
+from app.interface_adapters.doc_units.controllers.hierarchy_controller import (
+    HierarchyController,
+)
 from app.interface_adapters.doc_units.presenters.doc_unit_presenter import (
     DocUnitPresenter,
     DocUnitView,
     DocUnitViewModel,
 )
+from app.interface_adapters.doc_units.presenters.hierarchy_presenter import (
+    HierarchyPresenter,
+)
 
 from .details_view.details_view import DetailsView
+from .hierarchy.dock import HierarchyDock
 from .unit_composer_ui import Ui_UnitComposer
 from .unit_list.unit_list_item import UnitListItem
 
@@ -34,6 +41,8 @@ class DocUnitTab(Tab):
         self,
         presenter: DocUnitPresenter,
         controller: DocUnitController,
+        hierarchy_presenter: HierarchyPresenter,
+        hierarchy_controller: HierarchyController,
         parent: Optional[QMainWindow] = None,
     ) -> None:
         super().__init__(parent)
@@ -47,6 +56,11 @@ class DocUnitTab(Tab):
 
         self._details_view = DetailsView()
         self.ui.details_view_scrollArea.setWidget(self._details_view)
+        self._hierarchy_dock = HierarchyDock(
+            self.ui.unitHierarchyTreeView,
+            hierarchy_controller,
+            hierarchy_presenter,
+        )
 
         self._unit_items: Dict[str, Tuple[QListWidgetItem, UnitListItem]] = {}
         self._is_dirty = False
@@ -103,6 +117,7 @@ class DocUnitTab(Tab):
         if self._view_attached:
             self._presenter.detach_view()
             self._view_attached = False
+        self._hierarchy_dock.dispose()
         super().closeEvent(event)
 
     def _setup_connections(self) -> None:

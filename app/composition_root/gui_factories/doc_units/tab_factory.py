@@ -11,14 +11,28 @@ from app.application.doc_units.use_cases.rename_doc_unit import RenameDocUnit
 from app.application.doc_units.use_cases.set_active_doc_unit import (
     SetActiveDocUnit,
 )
+from app.application.doc_units.use_cases.hierarchy import (
+    CreateHierarchyFolder,
+    DeleteHierarchyNodes,
+    LoadHierarchy,
+    MoveHierarchyNodes,
+    RenameHierarchyNode,
+    SelectHierarchyNode,
+)
 from app.application.doc_units.ports import ActiveDocUnitStore
 from app.application.project.ports import CurrentProjectStore, IdGenerator
 from app.frameworks.pyside6_gui.tabs.doc_units.doc_unit_tab import DocUnitTab
 from app.interface_adapters.doc_units.controllers.doc_unit_controller import (
     DocUnitController,
 )
+from app.interface_adapters.doc_units.controllers.hierarchy_controller import (
+    HierarchyController,
+)
 from app.interface_adapters.doc_units.presenters.doc_unit_presenter import (
     DocUnitPresenter,
+)
+from app.interface_adapters.doc_units.presenters.hierarchy_presenter import (
+    HierarchyPresenter,
 )
 from app.interface_adapters.doc_units.repositories.project_doc_unit_repository import (
     ProjectDocUnitRepository,
@@ -64,6 +78,39 @@ def build_doc_unit_tab(
         events=event_bus,
     )
 
+    load_hierarchy_use_case = LoadHierarchy(
+        repository=doc_unit_repository,
+        active_store=active_doc_unit_store,
+        events=event_bus,
+    )
+    create_folder_use_case = CreateHierarchyFolder(
+        repository=doc_unit_repository,
+        active_store=active_doc_unit_store,
+        ids=id_generator,
+        events=event_bus,
+    )
+    rename_node_use_case = RenameHierarchyNode(
+        repository=doc_unit_repository,
+        active_store=active_doc_unit_store,
+        events=event_bus,
+    )
+    delete_nodes_use_case = DeleteHierarchyNodes(
+        repository=doc_unit_repository,
+        active_store=active_doc_unit_store,
+        events=event_bus,
+    )
+    move_nodes_use_case = MoveHierarchyNodes(
+        repository=doc_unit_repository,
+        active_store=active_doc_unit_store,
+        ids=id_generator,
+        events=event_bus,
+    )
+    select_node_use_case = SelectHierarchyNode(
+        repository=doc_unit_repository,
+        active_store=active_doc_unit_store,
+        events=event_bus,
+    )
+
     controller = DocUnitController(
         create_use_case=create_use_case,
         rename_use_case=rename_use_case,
@@ -71,5 +118,19 @@ def build_doc_unit_tab(
         set_active_use_case=set_active_use_case,
         import_asset_use_case=import_use_case,
     )
+    hierarchy_presenter = HierarchyPresenter(event_bus, load_hierarchy_use_case)
+    hierarchy_controller = HierarchyController(
+        load_use_case=load_hierarchy_use_case,
+        create_folder_use_case=create_folder_use_case,
+        rename_use_case=rename_node_use_case,
+        delete_use_case=delete_nodes_use_case,
+        move_use_case=move_nodes_use_case,
+        select_use_case=select_node_use_case,
+    )
 
-    return DocUnitTab(presenter=presenter, controller=controller)
+    return DocUnitTab(
+        presenter=presenter,
+        controller=controller,
+        hierarchy_presenter=hierarchy_presenter,
+        hierarchy_controller=hierarchy_controller,
+    )
