@@ -37,6 +37,7 @@ class FsProjectRepository(ProjectRepository):
         project_data_dict = json.loads(path.read_text(encoding="utf-8"))
         project_data = from_dict(project_data_dict)
         project_data.metadata.setdefault("project_root_path", str(path.parent))
+        project_data.metadata["project_meta_path"] = str(path)
         return project_data
 
     def save(self, path: str, project_data: ProjectData) -> str:
@@ -61,6 +62,7 @@ class FsProjectRepository(ProjectRepository):
                 )
 
         project_data.metadata.setdefault("project_root_path", str(file_path.parent))
+        project_data.metadata["project_meta_path"] = str(file_path)
 
         project_data_dict = to_dict(project_data)
         tmp = file_path.with_suffix(f"{file_path.suffix}.tmp")
@@ -79,6 +81,7 @@ class FsProjectRepository(ProjectRepository):
 
         project_meta_file_path = project_folder_path.joinpath(self.PROJECT_META_FILE_NAME)
         project_data.metadata.setdefault("project_root_path", str(project_folder_path))
+        project_data.metadata["project_meta_path"] = str(project_meta_file_path)
         self._atomic_write_json(project_meta_file_path, project_data)
         return str(project_meta_file_path)
 

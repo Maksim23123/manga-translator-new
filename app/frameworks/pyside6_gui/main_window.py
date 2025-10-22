@@ -50,12 +50,15 @@ class MainWindow(QMainWindow):
         new_project_action.triggered.connect(self._controller.on_new_project_triggered)
         save_project_action = QAction(parent=main_menu, text="Save")
         save_project_action.triggered.connect(self._controller.on_save_project_triggered)
+        save_project_as_action = QAction(parent=main_menu, text="Save As...")
+        save_project_as_action.triggered.connect(self._controller.on_save_project_as_triggered)
         load_project_action = QAction(parent=main_menu, text="Load")
         load_project_action.triggered.connect(self._controller.on_load_project_triggered)
         
         main_menu.addActions([
             new_project_action,
             save_project_action,
+            save_project_as_action,
             load_project_action
         ])
         

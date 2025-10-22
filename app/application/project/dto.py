@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 
 @dataclass(frozen=True, slots=True)
@@ -8,7 +9,7 @@ class CreateProjectRequest:
 
 @dataclass(frozen=True, slots=True)
 class SaveProjectRequest:
-    path: str
+    path: Optional[str] = None
 
 
 @dataclass(frozen=True, slots=True)

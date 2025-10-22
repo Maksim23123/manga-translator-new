@@ -17,6 +17,7 @@ from app.interface_adapters.project.repositories.fs_project_repository import (
 from app.interface_adapters.project.repositories.mem_current_project_store import (
     MemCurrentProjectStore,
 )
+from app.frameworks.pyside6_gui.project.qt_project_settings_store import QtProjectSettingsStore
 from app.interface_adapters.project.util.idgen_uuid import UUIDGenerator
 
 
@@ -24,6 +25,7 @@ def build_main_window() -> MainWindow:
     id_generator = UUIDGenerator()
     mem_current_project_store = MemCurrentProjectStore()
     fs_project_repository = FsProjectRepository()
+    project_settings_store = QtProjectSettingsStore()
 
     doc_unit_tab = build_doc_unit_tab(
         project_store=mem_current_project_store,
@@ -31,8 +33,16 @@ def build_main_window() -> MainWindow:
     )
 
     create_project_use_case = CreateProject(mem_current_project_store, id_generator)
-    save_project_use_case = SaveProject(mem_current_project_store, fs_project_repository)
-    load_project_use_case = LoadProject(mem_current_project_store, fs_project_repository)
+    save_project_use_case = SaveProject(
+        mem_current_project_store,
+        fs_project_repository,
+        project_settings_store,
+    )
+    load_project_use_case = LoadProject(
+        mem_current_project_store,
+        fs_project_repository,
+        project_settings_store,
+    )
 
     presenter = MainWindowPresenter()
     controller = MainWindowController(
@@ -40,6 +50,7 @@ def build_main_window() -> MainWindow:
         create_project_use_case,
         save_project_use_case,
         load_project_use_case,
+        project_settings_store,
         project_ready_callbacks=[doc_unit_tab.on_project_available],
     )
 
@@ -48,4 +59,5 @@ def build_main_window() -> MainWindow:
     main_window.connect_tabs([doc_unit_tab])
     if mem_current_project_store.is_set:
         doc_unit_tab.on_project_available()
+    controller.load_last_project_if_available()
     return main_window

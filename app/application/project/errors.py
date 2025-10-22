@@ -28,3 +28,7 @@ class InvalidPathError(Exception):
 
 class InvalidProjectDataError(Exception):
     """Raised when received project data is invalid."""
+
+
+class ProjectSaveLocationUndefinedError(Exception):
+    """Raised when a project save was requested without a known target path."""
