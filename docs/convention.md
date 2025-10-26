@@ -9,6 +9,7 @@
 - GUI factories are organized in a layered tree that mirrors the feature/modules layout (e.g., `composition_root/gui_factories/doc_units`).
 - Each significant tab or window gets its own factory function/class in a dedicated file; higher-level factories compose lower-level ones to produce the full `MainWindow`.
 - When introducing a new feature, create its factory module alongside the rest of the composition root tree rather than expanding monolithic factory files.
+
 ## Incomplete Work Markers
 - Use `# TODO`, `raise NotImplementedError`, or the literal `PROMPT_REQUIRED` to mark intentional gaps only inside scratch/spike files.
 - Production code must not contain those markers. Before committing, either implement the code or remove the marker.
