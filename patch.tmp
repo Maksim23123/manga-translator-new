@@ -1,0 +1,7 @@
+*** Begin Patch
+*** Update File: app/frameworks/pyside6_gui/tabs/doc_units/hierarchy/dock.py
+@@
+-        self._apply_selection(selected_node_ids, primary_node_id)
++        self._apply_selection(normalized_ids, primary_node_id)
+*** End Patch
+

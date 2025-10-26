@@ -89,7 +89,7 @@ class HierarchyDock(HierarchyView):
         ):
             return
 
-        self._apply_selection(normalized_ids, primary_node_id)
+        self._apply_selection(selected_node_ids, primary_node_id)
 
     # Internal helpers
     def _configure_tree_view(self) -> None:
@@ -276,4 +276,3 @@ class HierarchyDock(HierarchyView):
 
     def _show_error(self, message: str) -> None:
         QMessageBox.critical(self._tree_view, "Error", message)
-

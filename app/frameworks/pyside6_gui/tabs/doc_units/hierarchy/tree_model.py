@@ -113,7 +113,7 @@ class HierarchyTreeModel(QAbstractItemModel):
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlags:
         if not index.isValid():
-            return Qt.NoItemFlags
+            return Qt.ItemIsEnabled | Qt.ItemIsDropEnabled
         item: _TreeItem = index.internalPointer()
         flags = Qt.ItemIsEnabled | Qt.ItemIsSelectable | Qt.ItemIsEditable | Qt.ItemIsDragEnabled
         if item.node.node_type == "folder":
