@@ -57,6 +57,7 @@ from app.interface_adapters.media.filesystem_media_store import (
 class DocUnitTabBundle:
     tab: DocUnitTab
     finalize_assets: FinalizeDocUnitAssets
+    event_bus: DocUnitEventBus
 
 
 def build_doc_unit_tab(
@@ -165,4 +166,5 @@ def build_doc_unit_tab(
     return DocUnitTabBundle(
         tab=tab,
         finalize_assets=finalize_assets_use_case,
+        event_bus=event_bus,
     )

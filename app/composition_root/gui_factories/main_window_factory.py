@@ -33,6 +33,7 @@ def build_main_window() -> MainWindow:
         id_generator=id_generator,
     )
     doc_unit_tab = doc_unit_bundle.tab
+    doc_unit_event_bus = doc_unit_bundle.event_bus
 
     create_project_use_case = CreateProject(mem_current_project_store, id_generator)
     save_project_use_case = SaveProject(
@@ -46,13 +47,17 @@ def build_main_window() -> MainWindow:
         project_settings_store,
     )
 
-    presenter = MainWindowPresenter()
+    presenter = MainWindowPresenter(
+        project_store=mem_current_project_store,
+        event_bus=doc_unit_event_bus,
+    )
     controller = MainWindowController(
         presenter,
         create_project_use_case,
         save_project_use_case,
         load_project_use_case,
         project_settings_store,
+        doc_unit_event_bus=doc_unit_event_bus,
         finalize_doc_unit_assets=doc_unit_bundle.finalize_assets,
         project_ready_callbacks=[doc_unit_tab.on_project_available],
     )

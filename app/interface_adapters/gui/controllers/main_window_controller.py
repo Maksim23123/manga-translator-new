@@ -4,6 +4,10 @@ from typing import Callable, Optional, Sequence
 from app.application.doc_units.use_cases.finalize_doc_unit_assets import (
     FinalizeDocUnitAssets,
 )
+from app.application.doc_units.events import (
+    DocUnitEventBus,
+    ProjectDirtyStateChanged,
+)
 from app.application.project.use_cases.create_project import CreateProject
 from app.application.project.use_cases.save_project import SaveProject
 from app.application.project.use_cases.load_project import LoadProject
@@ -28,6 +32,7 @@ class MainWindowController:
         save_project_use_case: SaveProject,
         load_project_use_case: LoadProject,
         project_settings_store: ProjectSettingsStore,
+        doc_unit_event_bus: DocUnitEventBus,
         finalize_doc_unit_assets: FinalizeDocUnitAssets | None = None,
         project_ready_callbacks: Optional[Sequence[Callable[[], None]]] = None,
     ) -> None:
@@ -38,12 +43,15 @@ class MainWindowController:
         self._project_settings_store = project_settings_store
         self._project_ready_callbacks = list(project_ready_callbacks or [])
         self._finalize_doc_unit_assets = finalize_doc_unit_assets
+        self._doc_unit_event_bus = doc_unit_event_bus
 
     def on_new_project_triggered(self) -> None:
         if project_name := self._presenter.request_project_name():
             req = CreateProjectRequest(project_name)
             self._create_project_use_case.execute(req)
+            self._presenter.refresh_window_title()
             self._notify_project_ready()
+            self._publish_clean_state()
             log.info(f"Project created. Project name: {project_name}")
 
     def on_save_project_triggered(self) -> None:
@@ -62,7 +70,9 @@ class MainWindowController:
             try:
                 req = LoadProjectRequest(load_location)
                 self._load_project_use_case.execute(req)
+                self._presenter.refresh_window_title()
                 self._notify_project_ready()
+                self._publish_clean_state()
                 log.info("Project loaded")
             except Exception as ex:
                 log.error(ex)
@@ -75,7 +85,9 @@ class MainWindowController:
         try:
             req = LoadProjectRequest(last_path)
             self._load_project_use_case.execute(req)
+            self._presenter.refresh_window_title()
             self._notify_project_ready()
+            self._publish_clean_state()
             log.info("Last project loaded")
         except Exception as ex:
             log.error(ex)
@@ -96,6 +108,7 @@ class MainWindowController:
             req = SaveProjectRequest(save_path)
             response = self._save_project_use_case.execute(req)
             log.info(f"Project saved to: {response.access_path}")
+            self._publish_clean_state()
             return True
         except ProjectSaveLocationUndefinedError:
             raise
@@ -109,3 +122,9 @@ class MainWindowController:
                 self._attempt_save(save_location)
             except ProjectSaveLocationUndefinedError:
                 log.error("Save location remained undefined after prompting the user.")
+
+    def _publish_clean_state(self) -> None:
+        try:
+            self._doc_unit_event_bus.publish(ProjectDirtyStateChanged(False))
+        except Exception as ex:
+            log.exception("Failed to publish clean state: %s", ex)

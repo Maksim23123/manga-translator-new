@@ -66,6 +66,8 @@ class MainWindow(QMainWindow):
         
         self.setMenuBar(menu_bar)
     
+    def update_window_title(self, title: str) -> None:
+        self.setWindowTitle(title)
     
     def prompt_project_name(self) -> Optional[str]:
         text, ok = QInputDialog.getText(self, "New Project", "Project name:")
