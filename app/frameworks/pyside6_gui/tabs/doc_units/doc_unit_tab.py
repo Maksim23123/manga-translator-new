@@ -168,6 +168,10 @@ class DocUnitTab(Tab):
             self._details_view.switch_display_mode(self._details_view.NONE_SELECTED_DISPLAY_MODE)
 
     def on_project_available(self) -> None:
+        try:
+            self._controller.set_active_doc_unit(None)
+        except Exception as exc:
+            self.show_error(str(exc))
         if not self._view_attached:
             self._presenter.attach_view(self)
             self._view_attached = True

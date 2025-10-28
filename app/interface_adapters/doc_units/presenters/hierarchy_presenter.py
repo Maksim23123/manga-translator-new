@@ -93,6 +93,9 @@ class HierarchyPresenter:
         except RuntimeError:
             if self._view:
                 self._view.clear()
+        except KeyError:
+            if self._view:
+                self._view.clear()
 
     def _build_view_model(self, node: HierarchyNode) -> HierarchyNodeViewModel:
         return HierarchyNodeViewModel(
