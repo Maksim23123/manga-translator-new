@@ -1,0 +1,14 @@
+.vscode/.ropeproject/objectdb
+.vscode/settings.json
+*.pyc
+*.iml
+*.name
+*.xml
+nodes.log
+PyFlow/Configs/
+docs/build/
+docs/source/_build/
+docs/build_docs_env.bat
+.venv
+.idea
+__pycache__/
