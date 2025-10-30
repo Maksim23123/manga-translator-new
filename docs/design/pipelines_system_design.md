@@ -6,6 +6,7 @@ Participants: Assistant (Codex), Makss
 ## 1. Overview
 - Provides project-scoped authoring, persistence, and execution support for Manga Translator pipelines.
 - Couples a PyFlow-based visual editor with application/domain services that track pipeline metadata, active selection, and graph files.
+- Current UI ships with a placeholder “Graph Editor” tab that embeds the legacy MangaTranslator PyFlow add-on; its nodes/tools run in a dependency-stripped shell until the new pipeline stack replaces them.
 - Out of scope: doc-unit asset workflows, non-PyFlow execution engines, or low-level PyFlow custom node authoring.
 
 ## 2. Requirements & Constraints
@@ -54,6 +55,8 @@ Participants: Assistant (Codex), Makss
 - [ ] Wire pipelines bundle into composition root and project lifecycle (load/save, dirty tracking).
 - [ ] Implement graph pointer + temp promotion workflow (draft write, promotion on save, cleanup).
 - [ ] Add automated tests and developer documentation updates covering setup and usage.
+- [ ] Replace temporary legacy PyFlow add-on shim with new presenters/use cases once pipeline ports land; remove dependency guards when real implementations are available.
 
 ## 9. Changelog
 - 2025-10-29 - Drafted pipelines system architecture covering domain/application structure, PyFlow integration strategy, persistence model, and testing plan.
+- 2025-10-30 - Added interim Graph Editor tab wiring legacy PyFlow add-on in stripped-down mode pending full pipeline refactor.

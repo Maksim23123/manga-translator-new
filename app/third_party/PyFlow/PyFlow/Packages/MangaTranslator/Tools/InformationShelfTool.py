@@ -9,7 +9,10 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
 from PyFlow.UI.Tool.Tool import ShelfTool
 from PyFlow.Core.Common import Direction
 
-from icons.icons import Icons
+try:
+    from icons.icons import Icons
+except ModuleNotFoundError:
+    Icons = None  # type: ignore[assignment]
 
 
 
@@ -27,8 +30,9 @@ class InformationShelfTool(ShelfTool, QObject):
 
     @staticmethod
     def getIcon():
-        icon = QIcon(Icons.INFORMATION_ICON_PATH)
-        return icon
+        if Icons is None:
+            return QIcon()
+        return QIcon(Icons.INFORMATION_ICON_PATH)
 
     @staticmethod
     def name():

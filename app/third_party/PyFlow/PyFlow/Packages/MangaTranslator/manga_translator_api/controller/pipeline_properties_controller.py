@@ -1,5 +1,13 @@
-from core.core import Core
-from core.pipelines_manager.pipeline_unit import PipelineUnit
+try:
+    from core.core import Core
+except ModuleNotFoundError:
+    Core = None  # type: ignore[assignment]
+
+try:
+    from core.pipelines_manager.pipeline_unit import PipelineUnit
+except ModuleNotFoundError:
+    class PipelineUnit:  # type: ignore[override]
+        name: str = ""
 
 from ..gui.pipeline_properties import PipelineProperties
 
@@ -7,13 +15,14 @@ from ..gui.pipeline_properties import PipelineProperties
 
 class PipelinePropertiesController:
     def __init__(self, popeline_properties_widget: PipelineProperties):
-        self.core = Core()
-        self.event_bus = self.core.event_bus
+        self.core = Core() if Core else None
+        self.event_bus = self.core.event_bus if self.core else None  # type: ignore[attr-defined]
         self.connected_pipeline = None
         self.pipeline_properties_widget = popeline_properties_widget
 
         self._connect_to_events()
         self._connect_controller()
+        self._show_active_pipeline_data()
     
 
     def _connect_controller(self):
@@ -22,11 +31,17 @@ class PipelinePropertiesController:
 
 
     def _connect_to_events(self):
-        self.event_bus.activeProjectChanged.connect(self._show_active_pipeline_data)
-        self.event_bus.pipeline_manager_event_bus.activePipelineChanged.connect(self._show_active_pipeline_data)
+        if not self.event_bus:
+            return
+        self.event_bus.activeProjectChanged.connect(self._show_active_pipeline_data)  # type: ignore[attr-defined]
+        self.event_bus.pipeline_manager_event_bus.activePipelineChanged.connect(self._show_active_pipeline_data)  # type: ignore[attr-defined]
 
 
     def _show_active_pipeline_data(self):
+        if not self.core:
+            self.connected_pipeline = None
+            self._display_pipeline(None)
+            return
         self.connected_pipeline = self.core.pipelines_manager.active_pipeline
         self._display_pipeline(self.connected_pipeline)
     

@@ -1,8 +1,17 @@
 from PyFlow.Core import PinBase
 from PyFlow.Core.Common import *
 
-import cv2
-import numpy as np
+try:
+    import numpy as np
+except ModuleNotFoundError:
+    np = None  # type: ignore[assignment]
+
+try:
+    import cv2
+    _MAT_TYPE = cv2.typing.MatLike
+except ModuleNotFoundError:
+    cv2 = None  # type: ignore[assignment]
+    _MAT_TYPE = list
 
 
 
@@ -10,7 +19,8 @@ class ImageArrayPin(PinBase):
     """doc string for DemoPin"""
     def __init__(self, name, parent, direction, **kwargs):
         super(ImageArrayPin, self).__init__(name, parent, direction, **kwargs)
-        self.setDefaultValue(np.zeros)
+        default_value = np.zeros if np else lambda *args, **kwargs: []
+        self.setDefaultValue(default_value)
 
     @staticmethod
     def IsValuePin():
@@ -30,7 +40,7 @@ class ImageArrayPin(PinBase):
 
     @staticmethod
     def internalDataStructure():
-        return cv2.typing.MatLike
+        return _MAT_TYPE
 
     @staticmethod
     def processData(data):

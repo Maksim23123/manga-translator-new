@@ -1,7 +1,12 @@
 from PyFlow.Core import PinBase
 from PyFlow.Core.Common import *
 
-from pipeline.text_detector.hierarchy_builder.hierarchy import Hierarchy
+try:
+    from pipeline.text_detector.hierarchy_builder.hierarchy import Hierarchy
+except ModuleNotFoundError:
+    class Hierarchy:  # type: ignore[override]
+        """Placeholder hierarchy container used when pipeline dependencies are missing."""
+        pass
 
 
 

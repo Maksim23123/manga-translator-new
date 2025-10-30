@@ -2,8 +2,16 @@ from PyFlow.Core import NodeBase
 from PyFlow.Core.NodeBase import NodePinsSuggestionsHelper
 from PyFlow.Core.Common import *
 
-from pipeline.inpainter import Inpainter
-from pipeline.text_detector.hierarchy_builder.hierarchy import Hierarchy
+try:
+    from pipeline.inpainter import Inpainter
+except ModuleNotFoundError:
+    Inpainter = None  # type: ignore[assignment]
+
+try:
+    from pipeline.text_detector.hierarchy_builder.hierarchy import Hierarchy
+except ModuleNotFoundError:
+    class Hierarchy:  # type: ignore[override]
+        chunks_deepest_boxes = []
 
 
 
@@ -11,7 +19,7 @@ class InpainterNode(NodeBase):
     def __init__(self, name):
         super(InpainterNode, self).__init__(name)
 
-        self.inpainter = Inpainter()
+        self.inpainter = Inpainter() if Inpainter else None
 
         self.image_inp_pin = self.createInputPin('Image', 'ImageArrayPin')
         self.hierarchy_inp_pin = self.createInputPin('Hierarchy', 'HierarchyPin')
@@ -43,6 +51,10 @@ class InpainterNode(NodeBase):
     def compute(self, *args, **kwargs):
         hierarchy = self.hierarchy_inp_pin.getData()
         input_image = self.image_inp_pin.getData()
+
+        if self.inpainter is None:
+            self.setError("Inpainter dependency unavailable.")
+            return
 
         if (not input_image is None and not hierarchy is None
                 and isinstance(hierarchy, Hierarchy)):

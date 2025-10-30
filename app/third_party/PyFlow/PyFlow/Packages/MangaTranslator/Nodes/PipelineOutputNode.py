@@ -1,13 +1,17 @@
 from PyFlow.Core import NodeBase
 from PyFlow.Core.NodeBase import NodePinsSuggestionsHelper
 from PyFlow.Core.Common import *
-from core.core import Core
+
+try:
+    from core.core import Core
+except ModuleNotFoundError:
+    Core = None  # type: ignore[assignment]
 
 
 class PipelineOutputNode(NodeBase):
     def __init__(self, name):
         super(PipelineOutputNode, self).__init__(name)
-        self.core = Core()
+        self.core = Core() if Core else None
         self.remove_post_create = False
         
         self.pipeline_result_image_input_pin = self.createInputPin('Image', 'ImageArrayPin')
@@ -46,6 +50,8 @@ class PipelineOutputNode(NodeBase):
     
 
     def _register_as_output_node(self):
+        if not self.core:
+            return
         self.core.pipelines_manager.pyflow_interaction_manager.set_output_node(self)
 
 

@@ -2,7 +2,10 @@ from PyFlow.Core import NodeBase
 from PyFlow.Core.NodeBase import NodePinsSuggestionsHelper
 from PyFlow.Core.Common import *
 
-from pipeline.text_inserter import TextInserter
+try:
+    from pipeline.text_inserter import TextInserter
+except ModuleNotFoundError:
+    TextInserter = None  # type: ignore[assignment]
 
 
 
@@ -10,7 +13,7 @@ class TextInserterNode(NodeBase):
     def __init__(self, name):
         super(TextInserterNode, self).__init__(name)
 
-        self.text_inserter = TextInserter()
+        self.text_inserter = TextInserter() if TextInserter else None
 
         self.image_inp_pin = self.createInputPin('Image', 'ImageArrayPin')
         self.text_areas_inp_pin = self.createInputPin('Text areas', 'IntPin', structure=StructureType.Array)
@@ -47,8 +50,13 @@ class TextInserterNode(NodeBase):
         text_ares = self.text_areas_inp_pin.getData()
         text = self.text_inp_pin.getData()
 
+        if self.text_inserter is None:
+            self.setError("Text inserter dependency unavailable.")
+            return
+
         if image is None or text_ares is None or text is None:
             self.setError("Invalid input.")
+            return
 
         image_with_text = self.text_inserter.insert_text_into_image(image.copy(), text_ares, text)
 

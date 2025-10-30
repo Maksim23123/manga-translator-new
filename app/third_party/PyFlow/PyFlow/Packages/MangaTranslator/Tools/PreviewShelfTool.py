@@ -11,7 +11,10 @@ from PyFlow.UI.Tool.Tool import ShelfTool
 from PyFlow.Core.Common import Direction
 from PyFlow.UI.ContextMenuDataBuilder import ContextMenuDataBuilder
 
-from icons.icons import Icons
+try:
+    from icons.icons import Icons
+except ModuleNotFoundError:
+    Icons = None  # type: ignore[assignment]
 
 from qtpy import QtGui
 
@@ -37,8 +40,9 @@ class PreviewShelfTool(ShelfTool, QObject):
 
     @staticmethod
     def getIcon():
-        icon = QIcon(Icons.PLAY_ICON_PATH)
-        return icon
+        if Icons is None:
+            return QIcon()
+        return QIcon(Icons.PLAY_ICON_PATH)
 
     @staticmethod
     def name():
