@@ -5,6 +5,10 @@ from app.composition_root.gui_factories.doc_units.tab_factory import (
     DocUnitTabBundle,
     build_doc_unit_tab,
 )
+from app.composition_root.gui_factories.pipelines.tab_factory import (
+    GraphEditorTabBundle,
+    build_graph_editor_tab,
+)
 from app.frameworks.pyside6_gui.main_window import MainWindow
 from app.interface_adapters.gui.controllers.main_window_controller import (
     MainWindowController,
@@ -35,6 +39,9 @@ def build_main_window() -> MainWindow:
     doc_unit_tab = doc_unit_bundle.tab
     doc_unit_event_bus = doc_unit_bundle.event_bus
 
+    graph_editor_bundle: GraphEditorTabBundle = build_graph_editor_tab()
+    graph_editor_tab = graph_editor_bundle.tab
+
     create_project_use_case = CreateProject(mem_current_project_store, id_generator)
     save_project_use_case = SaveProject(
         mem_current_project_store,
@@ -59,13 +66,17 @@ def build_main_window() -> MainWindow:
         project_settings_store,
         doc_unit_event_bus=doc_unit_event_bus,
         finalize_doc_unit_assets=doc_unit_bundle.finalize_assets,
-        project_ready_callbacks=[doc_unit_tab.on_project_available],
+        project_ready_callbacks=[
+            doc_unit_tab.on_project_available,
+            graph_editor_tab.on_project_available,
+        ],
     )
 
     main_window = MainWindow(presenter, controller)
 
-    main_window.connect_tabs([doc_unit_tab])
+    main_window.connect_tabs([doc_unit_tab, graph_editor_tab])
     if mem_current_project_store.is_set:
         doc_unit_tab.on_project_available()
+        graph_editor_tab.on_project_available()
     controller.load_last_project_if_available()
     return main_window
