@@ -90,10 +90,7 @@ class HierarchyPresenter:
     def _trigger_load(self) -> None:
         try:
             self._load_use_case.execute()
-        except RuntimeError:
-            if self._view:
-                self._view.clear()
-        except KeyError:
+        except (RuntimeError, KeyError):
             if self._view:
                 self._view.clear()
 

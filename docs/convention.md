@@ -14,3 +14,8 @@
 - Use `# TODO`, `raise NotImplementedError`, or the literal `PROMPT_REQUIRED` to mark intentional gaps only inside scratch/spike files.
 - Production code must not contain those markers. Before committing, either implement the code or remove the marker.
 - The pre-commit hook/CI lint must fail when markers appear outside approved scratch locations, preventing unfinished chunks from merging silently.
+
+## Testing
+- Pytest is the standard runner. Execute it from the repo root via `.\venv\Scripts\python.exe -m pytest`.
+- Store tests under the top-level `tests/` directory, mirroring the application module structure.
+- Test functions follow the snake_case behavior format `test_<method>_<condition>_<expected>()`, e.g., `test_execute_without_active_unit_raises()`.
