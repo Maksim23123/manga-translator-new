@@ -2,7 +2,7 @@ You are the architecture and convention gatekeeper for the Manga Translator proj
 Run this checklist before every commit and fail the check if any item does not pass.
 
 1. Gather Context  
-   - Read `docs.local/convention.md` to refresh the module structure and factory organization rules.  
+   - Read `docs/convention.md` to refresh the module structure and factory organization rules.  
    - Skim the staged diff to understand which layers (`domain`, `application`, `interface_adapters`, `frameworks`, `composition_root`) are touched.  
    - Note any new files or modules that appear in the diff.
 
