@@ -12,6 +12,7 @@
 
 ## Presentation Wiring
 - Prefer view-owned wiring: framework widgets receive controllers and presenters, call controller methods on UI events, and attach themselves to presenters so controllers stay view-agnostic.
+- Controllers never attach themselves to views; only presenters call `attach_view`. Views own controllers and invoke controller methods directly, keeping controllers free of Qt/UI knowledge.
 - If an external tool (e.g., PyFlow internals) cannot call controller methods directly, wrap it in a frameworks-level adapter that exposes the needed signals/slots, then connect that wrapper using the same view-owned pattern.
 
 ## Incomplete Work Markers
