@@ -60,3 +60,8 @@ Participants: Assistant (Codex), Makss
 ## 9. Changelog
 - 2025-10-29 - Drafted pipelines system architecture covering domain/application structure, PyFlow integration strategy, persistence model, and testing plan.
 - 2025-10-30 - Added interim Graph Editor tab wiring legacy PyFlow add-on in stripped-down mode pending full pipeline refactor.
+
+## 10. Presentation Wiring Conventions
+- Prefer the view-owned wiring already used in doc-units: framework widgets receive controllers and presenters, call controller methods in response to UI events, and attach themselves to presenters (controllers remain view-agnostic).
+- Pipeline controllers currently bind callbacks on the view; refactor them toward the view-owned pattern to keep interface adapters passive and views housed in the frameworks layer.
+- When an external tool (e.g., PyFlow internals) cannot easily call controller methods directly, wrap it in a frameworks-level adapter that exposes the needed signals/slots, then hook that wrapper to controllers using the same view-owned pattern.

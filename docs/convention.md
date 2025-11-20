@@ -10,6 +10,10 @@
 - Each significant tab or window gets its own factory function/class in a dedicated file; higher-level factories compose lower-level ones to produce the full `MainWindow`.
 - When introducing a new feature, create its factory module alongside the rest of the composition root tree rather than expanding monolithic factory files.
 
+## Presentation Wiring
+- Prefer view-owned wiring: framework widgets receive controllers and presenters, call controller methods on UI events, and attach themselves to presenters so controllers stay view-agnostic.
+- If an external tool (e.g., PyFlow internals) cannot call controller methods directly, wrap it in a frameworks-level adapter that exposes the needed signals/slots, then connect that wrapper using the same view-owned pattern.
+
 ## Incomplete Work Markers
 - Use `# TODO`, `raise NotImplementedError`, or the literal `PROMPT_REQUIRED` to mark intentional gaps only inside scratch/spike files.
 - Production code must not contain those markers. Before committing, either implement the code or remove the marker.
