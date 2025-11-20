@@ -6,7 +6,8 @@ Participants: Assistant (Codex), Makss
 ## 1. Overview
 - Provides project-scoped authoring, persistence, and execution support for Manga Translator pipelines.
 - Couples a PyFlow-based visual editor with application/domain services that track pipeline metadata, active selection, and graph files.
-- Current UI ships with a placeholder “Graph Editor” tab that embeds the legacy MangaTranslator PyFlow add-on; its nodes/tools run in a dependency-stripped shell until the new pipeline stack replaces them.
+- Current UI ships with a placeholder "Graph Editor" tab that embeds the legacy MangaTranslator PyFlow add-on; its nodes/tools run in a dependency-stripped shell until the new pipeline stack replaces them.
+- The tab now wires the PyFlow dock tools (pipelines list, pipeline properties) through framework-level adapters that attach presenters and controllers from the interface_adapters layer, keeping view ownership on the Qt side.
 - Out of scope: doc-unit asset workflows, non-PyFlow execution engines, or low-level PyFlow custom node authoring.
 
 ## 2. Requirements & Constraints
@@ -18,21 +19,21 @@ Participants: Assistant (Codex), Makss
 
 ## 3. Architecture & Flow
 - **Domain layer:** introduces `PipelineUnit` (name, graph path, dirty hooks), `PipelineCollection` (formerly `PipelineData`), and supporting services for name generation and graph path resolution.
-- **Application layer:** use cases expose pipeline list retrieval, creation, rename/delete, active selection, preview image updates, graph save/load triggers, and execution entry points. Ports abstract persistence and PyFlow orchestration.
-- **Interface adapters:** repositories read/write the pipeline section of the project metadata document, presenters/controllers translate use case responses into Qt view models, and an interaction gateway wraps PyFlow APIs (`PyFlowInteractionManager`, `PipelineExecutor`).
-- **Frameworks layer:** PySide6 widgets compose the pipeline tab, integrate PyFlow widget tree, manage dock tools, and surface signals (modified state, selection). Filesystem adapters ensure graph files live under `<project>/pipelines/`. Dock widgets (pipeline list, properties, preview) remain packaged as PyFlow add-ons under the MangaTranslator plugin; they will be refactored to consume the new presenters/use cases instead of the legacy `Core` singleton.
-- Flow: Qt action -> controller -> use case -> repository/interaction manager -> event bus -> presenter -> PySide6 view (including PyFlow component). Project save delegates to pipeline save use case, which persists metadata and graph files.
+- **Application layer:** use cases expose pipeline list retrieval, creation, rename/delete, active selection, preview image updates, graph save/load triggers, and execution entry points. Ports abstract persistence and PyFlow orchestration; `PipelineService` now drives a PyFlow gateway and publishes events through `PipelineEventBus`.
+- **Interface adapters:** in-memory metadata repository (`MemPipelineMetadataRepository`) and filesystem `LocalGraphStorage` sit behind ports; presenters/controllers translate use case responses into Qt view models; `DeferredPyFlowGateway` defers PyFlow calls until the wrapper attaches.
+- **Frameworks layer:** PySide6 widgets compose the pipeline tab, integrate PyFlow widget tree, manage dock tools, and surface signals (modified state, selection). `PyFlowWrapper` exposes the PyFlow gateway API while wiring dock tool adapters. Dock widgets (pipeline list, properties, preview) remain packaged as PyFlow add-ons under the MangaTranslator plugin; adapters live in `frameworks` to bridge them to the presenters/controllers.
+- Flow: Qt action -> controller -> use case -> repository/storage/PyFlow gateway -> event bus -> presenter -> PySide6 view (including PyFlow component and dock adapters). Project save delegates to pipeline save use case, which persists metadata and graph files.
 
 ## 4. Data & Storage
 - Project metadata: pipelines serialize into the existing project meta file (e.g., `project_meta.json`) under a dedicated `pipelines` key containing the list of pipeline entries. Each entry stores the pipeline name plus a `graph_pointer` structure (status, final path hint, temp draft path) so we can reuse the same promotion pattern as doc-unit assets.
-- Graph artifacts: `.pygraph` files written initially into `<project>/temp/pipelines/` (draft) while editing; on project save the draft file is promoted into `<project>/pipelines/` and the pointer status flips to `final`. Naming still follows collision-free rules (e.g., `Pipeline (2).pygraph`).
+- Graph artifacts: `.pygraph` files written initially into `<project>/temp/pipelines/` (draft) while editing; on project save the draft file is promoted into `<project>/pipelines/` and the pointer status flips to `final`. Naming still follows collision-free rules (e.g., `Pipeline (2).pygraph`). Current stub storage writes to `data/pipelines/` (with `drafts/` subfolder) until project-level integration arrives.
 - In-memory caches: application keeps a `PipelineCollection` for the current project and tracks the active `PipelineUnit`; PyFlow instance holds the live graph. The interaction manager resolves pointers to decide whether to load draft or final files.
 - Cleanup rules: deleting a pipeline queues its draft/final graph files for removal; project switching clears cached state, removes orphaned drafts, and resets PyFlow to a blank graph.
 
 ## 5. Events & Communication
 - Pipeline event bus (mirrors doc-unit pattern) emits: `PipelineListUpdated`, `PipelineAdded`, `PipelineRemoved`, `PipelineRenamed`, `ActivePipelineChanged`, `PipelineGraphDirtyChanged`, and `PreviewImagePathChanged`.
-- Cross-module signals: project controller notifies pipelines bundle when a project loads/saves; PyFlow wrapper raises `modifiedChanged` which feeds dirty-state events; persistence manager requests pipeline data flush before project write.
-- PyFlow interaction manager listens for project change events to reset state and publishes preview path updates into the GUI dock tools.
+- Cross-module signals: project controller notifies pipelines bundle when a project loads/saves; PyFlow wrapper raises `modifiedChanged` which feeds dirty-state events through the PyFlow gateway into `PipelineService`; persistence manager requests pipeline data flush before project write.
+- PyFlow interaction manager (currently `DeferredPyFlowGateway` + `PyFlowWrapper`) listens for delegate attachment and publishes dirty events; dock adapters in frameworks attach presenters to the PyFlow plugin widgets to reflect list/properties updates.
 
 ## 6. Edge Cases & Risks
 - Corrupted or missing pipeline metadata inside the project meta document should fail gracefully (log, reset to empty) instead of crashing load.
@@ -46,22 +47,24 @@ Participants: Assistant (Codex), Makss
 - Integration tests exercising PyFlow interaction manager with a stubbed PyFlow facade to verify graph load/save and preview updates.
 - Acceptance-level smoke test that boots the GUI tab with a mocked project store to confirm widgets bind and dirty signals propagate.
 - File-based tests to validate cleanup of orphaned draft/final `.pygraph` files when pipelines are removed or saves fail mid-promotion.
+- Added coverage: `tests/interface_adapters/pipelines/test_local_graph_storage.py` exercises draft-to-final promotion; `tests/frameworks/pyside6_gui/tabs/pipelines/test_dock_adapters.py` verifies PyFlow dock adapters forward signals and follow view-owned wiring.
 
 ## 8. Implementation Checklist
-- [ ] Port domain models (`PipelineUnit`, collection) with validation and change hooks.
-- [ ] Build application use cases and repositories for metadata persistence (inline with project meta) and PyFlow interaction.
-- [ ] Implement PySide6 pipeline tab, controllers, and presenters integrating the PyFlow widget.
-- [ ] Refactor PyFlow dock tools (list, properties, preview) to invoke the new pipeline adapters/use cases while staying within the plugin package.
-- [ ] Wire pipelines bundle into composition root and project lifecycle (load/save, dirty tracking).
-- [ ] Implement graph pointer + temp promotion workflow (draft write, promotion on save, cleanup).
-- [ ] Add automated tests and developer documentation updates covering setup and usage.
-- [ ] Replace temporary legacy PyFlow add-on shim with new presenters/use cases once pipeline ports land; remove dependency guards when real implementations are available.
+- [x] Port domain models (`PipelineUnit`, collection) with validation and change hooks.
+- [x] Build initial application service and ports for metadata, storage, and PyFlow interaction (`PipelineService`, `DeferredPyFlowGateway` stub).
+- [x] Implement PySide6 pipeline tab, controllers, and presenters integrating the PyFlow widget with view-owned dock adapters for list/properties.
+- [x] Implement graph pointer + temp promotion workflow in `LocalGraphStorage` (draft write, promotion on save, cleanup) with tests.
+- [ ] Persist pipeline metadata into project meta (currently in-memory `MemPipelineMetadataRepository`).
+- [ ] Wire pipelines bundle into project lifecycle (load/save coordination, dirty tracking tied to project save).
+- [ ] Refactor PyFlow dock tool preview wiring and replace legacy add-on shims once pipeline ports land; remove dependency guards when real implementations are available.
+- [ ] Add automated tests for full service flow (create/rename/delete/set-active) and preview persistence round-trips.
 
 ## 9. Changelog
 - 2025-10-29 - Drafted pipelines system architecture covering domain/application structure, PyFlow integration strategy, persistence model, and testing plan.
 - 2025-10-30 - Added interim Graph Editor tab wiring legacy PyFlow add-on in stripped-down mode pending full pipeline refactor.
+- 2025-11-20 - Wired PyFlow dock list/properties via framework adapters and presenters/controllers, added deferred PyFlow gateway and local graph storage under `data/pipelines/`, composed the pipelines bundle inside the tab factory, and introduced tests for storage promotion and dock adapters.
 
 ## 10. Presentation Wiring Conventions
 - Prefer the view-owned wiring already used in doc-units: framework widgets receive controllers and presenters, call controller methods in response to UI events, and attach themselves to presenters (controllers remain view-agnostic).
-- Pipeline controllers currently bind callbacks on the view; refactor them toward the view-owned pattern to keep interface adapters passive and views housed in the frameworks layer.
+- Pipeline list/properties docks now use framework-level adapters that attach presenters and forward user actions to controllers, keeping controllers/presenters free of PyFlow widget knowledge.
 - When an external tool (e.g., PyFlow internals) cannot easily call controller methods directly, wrap it in a frameworks-level adapter that exposes the needed signals/slots, then hook that wrapper to controllers using the same view-owned pattern.

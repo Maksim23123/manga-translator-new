@@ -5,7 +5,15 @@ from typing import Optional
 from PySide6.QtWidgets import QWidget
 
 from app.frameworks.pyside6_gui.tabs.tab import Tab
+from app.interface_adapters.pipelines.controllers.pipeline_list_controller import PipelineListController
+from app.interface_adapters.pipelines.controllers.pipeline_properties_controller import (
+    PipelinePropertiesController,
+)
 from app.interface_adapters.pipelines.controllers.pyflow_controller import PyFlowController
+from app.interface_adapters.pipelines.presenters.pipeline_list_presenter import PipelineListPresenter
+from app.interface_adapters.pipelines.presenters.pipeline_properties_presenter import (
+    PipelinePropertiesPresenter,
+)
 from app.interface_adapters.pipelines.presenters.pyflow_presenter import PyFlowPresenter
 
 from .pyflow_wrapper import PyFlowWrapper
@@ -20,6 +28,11 @@ class GraphEditorTab(Tab):
         self,
         presenter: PyFlowPresenter,
         controller: PyFlowController,
+        *,
+        pipeline_list_controller: Optional[PipelineListController] = None,
+        pipeline_list_presenter: Optional[PipelineListPresenter] = None,
+        pipeline_properties_controller: Optional[PipelinePropertiesController] = None,
+        pipeline_properties_presenter: Optional[PipelinePropertiesPresenter] = None,
         parent: Optional[QWidget] = None,
     ) -> None:
         super().__init__(parent)
@@ -33,8 +46,11 @@ class GraphEditorTab(Tab):
         self._pyflow_wrapper = PyFlowWrapper(
             presenter=presenter,
             controller=controller,
-            parent=self,
-            hide_menu_bar=False,
+            pipeline_list_controller=pipeline_list_controller,
+            pipeline_list_presenter=pipeline_list_presenter,
+            pipeline_properties_controller=pipeline_properties_controller,
+            pipeline_properties_presenter=pipeline_properties_presenter,
+            parent=self
         )
         self.setCentralWidget(self._pyflow_wrapper)
 
