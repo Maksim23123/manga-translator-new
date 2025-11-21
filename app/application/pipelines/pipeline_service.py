@@ -125,8 +125,12 @@ class PipelineService:
         self._publish(PipelineRemoved(name))
         self._publish(PipelineListUpdated([p.name for p in self._collection.list()]))
 
-        if removed.graph.status != GraphPointerStatus.MISSING:
-            self._storage.delete_graph(removed.graph)
+        # Keep final graphs; clean up drafts immediately since they won't be reused.
+        if removed.graph.draft_path:
+            try:
+                removed.graph.draft_path.unlink(missing_ok=True)
+            except Exception:
+                log.debug("Failed to delete draft graph %s", removed.graph.draft_path, exc_info=True)
         if self._preview_port:
             self._preview_port.delete_preview(removed)
 
@@ -228,8 +232,7 @@ class PipelineService:
             log.debug("Failed to cleanup pipeline orphans", exc_info=True)
 
     def cleanup_after_save(self) -> None:
-        """Prune temp/final orphans and remove shared temp for current project."""
-        self._cleanup_orphans()
+        """Remove shared temp for current project after successful save/promotion."""
         try:
             self._storage.cleanup_current_shared_temp()
         except Exception:

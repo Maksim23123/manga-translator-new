@@ -33,9 +33,10 @@ Participants: Assistant (Codex), Makss
 - Pre-project fallback: when there is no project path yet (e.g., new project before first save), write drafts to a shared temp root (e.g., `data/temp/pipelines` or an OS cache dir). Use per-project subfolders within the shared root (e.g., `data/temp/pipelines/<project_id_or_hash>/`) to isolate drafts; on first save, switch the base to `<project>/temp/pipelines/`, promote drafts to `<project>/pipelines/`, then delete that subfolder if promotion succeeds.
 - In-memory caches: application keeps a `PipelineCollection` for the current project and tracks the active `PipelineUnit` via an `ActivePipelineStore` (transient, not persisted). PyFlow instance holds the live graph. The interaction manager resolves pointers to decide whether to load draft or final files.
 - Active switch rule: when changing the active pipeline, persist the current pipeline’s graph to its draft path before switching (at minimum when marked dirty), then load the newly selected pipeline into PyFlow. Active selection resets on project load/create.
-- Cleanup rules: deleting a pipeline queues its draft/final graph files for removal; project switching clears cached state, removes orphaned drafts, and resets PyFlow to a blank graph.
+- Cleanup rules: deleting a pipeline now leaves its draft/final graph files on disk for temporary recovery; the next load runs the orphan sweep and resets PyFlow to a blank graph.
 - Promotion semantics: on project save, promote draft graphs into `<project>/pipelines/`, update graph pointers to `final`, replace prior finals, and if promotion fails keep the existing final and surface/log the error instead of leaving the pipeline unusable.
-- Orphan cleanup: on startup sweep stale per-project temp subfolders in the shared root for projects not mounted; on save, after successful promotion, delete the current project’s shared-temp subfolder. Also prune orphaned drafts/finals inside `<project>/temp/pipelines/` and `<project>/pipelines/` whose names do not exist in the pipeline collection, guarding against deleting any in-use files.
+- Orphan cleanup: on startup/load sweep stale per-project temp subfolders in the shared root for projects not mounted; after successful promotion, delete only the current project’s shared-temp subfolder. The project-local orphan sweep (drafts/finals missing from the collection) runs during load rather than during save to avoid racing PyFlow writes while persisting the project.
+- Save cleanup scope: `cleanup_after_save` is scoped to clearing the shared temp subfolder; graph orphan pruning is intentionally deferred to the load-time sweep to minimize the chance of deleting files while PyFlow is still writing them.
 
 ## 5. Events & Communication
 - Pipeline event bus (mirrors doc-unit pattern) emits: `PipelineListUpdated`, `PipelineAdded`, `PipelineRemoved`, `PipelineRenamed`, `ActivePipelineChanged`, `PipelineGraphDirtyChanged`, and `PreviewImagePathChanged`.
@@ -53,7 +54,7 @@ Participants: Assistant (Codex), Makss
 - Unit tests for pipeline use cases (create/rename/delete/set-active, metadata persistence round-trips, unique name generator).
 - Integration tests exercising PyFlow interaction manager with a stubbed PyFlow facade to verify graph load/save and preview updates.
 - Acceptance-level smoke test that boots the GUI tab with a mocked project store to confirm widgets bind and dirty signals propagate.
-- File-based tests to validate cleanup of orphaned draft/final `.pygraph` files when pipelines are removed or saves fail mid-promotion.
+- File-based tests to validate load-time cleanup of orphaned draft/final `.pygraph` files (including ones left after pipeline deletion) and shared temp sweeping.
 - Added coverage: `tests/interface_adapters/pipelines/test_local_graph_storage.py` exercises draft-to-final promotion; `tests/frameworks/pyside6_gui/tabs/pipelines/test_dock_adapters.py` verifies PyFlow dock adapters forward signals and follow view-owned wiring.
 
 ## 8. Implementation Checklist
@@ -75,6 +76,7 @@ Participants: Assistant (Codex), Makss
 - 2025-11-21 - Prompt pipeline name on creation through the PyFlow pipelines list dock to align with legacy/doc-unit UX.
 - 2025-11-22 - Introduced shared project lifecycle event bus for dirty tracking and moved active pipeline tracking to a transient store (not persisted).
 - 2025-11-23 - Implemented per-project shared temp isolation and orphan cleanup for pipeline drafts/finals.
+- 2025-11-24 - Deferred pipeline deletion cleanup to load-time orphan sweeping and narrowed `cleanup_after_save` to shared-temp removal to reduce save-time contention with PyFlow writes.
 
 ## 10. Presentation Wiring Conventions
 - Prefer the view-owned wiring already used in doc-units: framework widgets receive controllers and presenters, call controller methods in response to UI events, and attach themselves to presenters (controllers remain view-agnostic).
