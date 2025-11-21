@@ -15,6 +15,7 @@ Participants: Assistant (Codex), Makss
 - Active pipeline graph edits happen inside PyFlow; saves persist both metadata (embedded inside the project meta document) and `.pygraph` files alongside the project.
 - Integrates with project lifecycle (new/load/save) so that pipeline state loads on project open and persists on save without user intervention.
 - GUI behaviour should mirror the legacy application: pipeline list dock, properties pane, modified indicators, and preview image plumbing.
+- When no active pipeline exists, the PyFlow canvas is disabled/blocked to mirror legacy behaviour and avoid editing a non-existent pipeline.
 - Non-functional: support Windows-first filesystem semantics, tolerate missing/corrupted metadata sections, keep UI responsive, and avoid duplicating heavyweight PyFlow instances.
 
 ## 3. Architecture & Flow
@@ -29,7 +30,9 @@ Participants: Assistant (Codex), Makss
 - Graph artifacts: `.pygraph` files written initially into `<project>/temp/pipelines/` (draft) while editing; on project save the draft file is promoted into `<project>/pipelines/` and the pointer status flips to `final`. Naming still follows collision-free rules (e.g., `Pipeline (2).pygraph`). Current stub storage writes to `data/pipelines/` (with `drafts/` subfolder) until project-level integration arrives.
 - Pre-project fallback: when there is no project path yet (e.g., new project before first save), write drafts to a shared temp root (e.g., `data/temp/pipelines` or an OS cache dir); on first save, switch the base to `<project>/temp/pipelines/`, promote drafts to `<project>/pipelines/`, and periodically sweep the shared temp root to avoid orphans.
 - In-memory caches: application keeps a `PipelineCollection` for the current project and tracks the active `PipelineUnit`; PyFlow instance holds the live graph. The interaction manager resolves pointers to decide whether to load draft or final files.
+- Active switch rule: when changing the active pipeline, persist the current pipeline’s graph to its draft path before switching (at minimum when marked dirty), then load the newly selected pipeline into PyFlow.
 - Cleanup rules: deleting a pipeline queues its draft/final graph files for removal; project switching clears cached state, removes orphaned drafts, and resets PyFlow to a blank graph.
+- Promotion semantics: on project save, promote draft graphs into `<project>/pipelines/`, update graph pointers to `final`, replace prior finals, and if promotion fails keep the existing final and surface/log the error instead of leaving the pipeline unusable.
 
 ## 5. Events & Communication
 - Pipeline event bus (mirrors doc-unit pattern) emits: `PipelineListUpdated`, `PipelineAdded`, `PipelineRemoved`, `PipelineRenamed`, `ActivePipelineChanged`, `PipelineGraphDirtyChanged`, and `PreviewImagePathChanged`.
