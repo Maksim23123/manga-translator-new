@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import Callable, Optional, Sequence
 
 from app.application.doc_units.use_cases.finalize_doc_unit_assets import (
@@ -18,6 +19,7 @@ from app.application.project.dto import (
 )
 from app.application.project.errors import ProjectSaveLocationUndefinedError
 from app.application.project.ports import ProjectSettingsStore
+from app.interface_adapters.project.util.fs_names import safe_folder_name
 
 from ..presenters.main_window_presenter import MainWindowPresenter
 
@@ -100,8 +102,20 @@ class MainWindowController:
             except Exception as ex:
                 log.exception("Project ready callback failed: %s", ex)
 
-    def _attempt_save(self, save_path: Optional[str]) -> bool:
+    def _attempt_save(self, save_path: Optional[str]) -> bool: # TODO probably need to redesign use-cases for project saving. So they process all the cases
         try:
+            project_slot = getattr(self._save_project_use_case, "project_slot", None)
+            project_data = project_slot.get_data() if project_slot else None
+
+            target_path = save_path or (project_data.metadata.get("project_meta_path") if project_data else None)
+            if not target_path:
+                raise ProjectSaveLocationUndefinedError("Project save location is undefined.")
+
+            self._ensure_project_root_path(target_path)
+            project_root_path = project_data.metadata.get("project_root_path") if project_data else None
+            if not project_root_path:
+                raise ProjectSaveLocationUndefinedError("Project root path is undefined.")
+
             if self._finalize_doc_unit_assets:
                 self._finalize_doc_unit_assets.execute()
 
@@ -128,3 +142,34 @@ class MainWindowController:
             self._doc_unit_event_bus.publish(ProjectDirtyStateChanged(False))
         except Exception as ex:
             log.exception("Failed to publish clean state: %s", ex)
+
+    def _ensure_project_root_path(self, save_path: str) -> None:
+        """
+        Populate project_root_path before finalizing assets so the media store
+        knows where to write files on first save.
+        """
+        project_slot = getattr(self._save_project_use_case, "project_slot", None)
+        if not project_slot:
+            return
+
+        project_data = project_slot.get_data()
+        if not project_data:
+            return
+        if project_data.metadata.get("project_root_path"):
+            return
+
+        root_path = self._derive_project_root_path(save_path, project_data.name.value)
+        project_data.metadata["project_root_path"] = root_path
+        project_slot.set_data(project_data)
+
+    def _derive_project_root_path(self, save_path: str, project_name: str) -> str:
+        repository = getattr(self._save_project_use_case, "project_repository", None)
+        base_path = Path(save_path)
+
+        if repository and hasattr(repository, "resolve_meta"):
+            meta_path = repository.resolve_meta(str(base_path))
+            if meta_path:
+                return str(meta_path.parent)
+
+        project_dir_name = safe_folder_name(project_name)
+        return str(base_path.joinpath(project_dir_name))
