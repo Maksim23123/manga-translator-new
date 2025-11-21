@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
-from PySide6.QtWidgets import QListWidget, QListWidgetItem
+from PySide6.QtWidgets import QInputDialog, QListWidget, QListWidgetItem
 
 from app.interface_adapters.pipelines.controllers.pipeline_list_controller import PipelineListController
 from app.interface_adapters.pipelines.controllers.pipeline_properties_controller import (
@@ -39,14 +39,16 @@ class PipelinesListDockAdapter(PipelineListView):
         dock: PipelinesListDockTool,
         controller: PipelineListController | None = None,
         presenter: PipelineListPresenter | None = None,
+        name_provider: Optional[Callable[[], Optional[str]]] = None,
     ) -> None:
         self._dock = dock
         self._controller = controller
         self._list: PipelinesList = dock.pipelines_list
         self._list_widget: QListWidget = self._list.pipelines_list_listWidget
-        self._create_cb: Optional[Callable[[], None]] = None
+        self._create_cb: Optional[Callable[[str], None]] = None
         self._select_cb: Optional[Callable[[str], None]] = None
         self._delete_cb: Optional[Callable[[str], None]] = None
+        self._name_provider = name_provider or self._prompt_for_name
         self._suppress_selection = False
 
         self._list.new_pipeline_toolButton.clicked.connect(self._on_create_clicked)
@@ -78,7 +80,7 @@ class PipelinesListDockAdapter(PipelineListView):
         self._list_widget.setEnabled(enabled)
         self._list.new_pipeline_toolButton.setEnabled(enabled)
 
-    def on_create_requested(self, callback: Callable[[], None]) -> None:
+    def on_create_requested(self, callback: Callable[[str], None]) -> None:
         self._create_cb = callback
 
     def on_select_requested(self, callback: Callable[[str], None]) -> None:
@@ -98,11 +100,14 @@ class PipelinesListDockAdapter(PipelineListView):
         return None
 
     def _on_create_clicked(self) -> None:
+        name = self._name_provider()
+        if not name:
+            return
         if self._controller:
-            self._controller.create_pipeline()
+            self._controller.create_pipeline(name)
             return
         if self._create_cb:
-            self._create_cb()
+            self._create_cb(name)
 
     def _on_selection_changed(self) -> None:
         if self._suppress_selection:
@@ -123,6 +128,13 @@ class PipelinesListDockAdapter(PipelineListView):
         if self._delete_cb:
             self._delete_cb(name)
 
+    def _prompt_for_name(self) -> Optional[str]:
+        text, ok = QInputDialog.getText(self._list, "Create Pipeline", "Pipeline name:")
+        if not ok:
+            return None
+        name = text.strip()
+        return name or None
+
 
 class PipelinePropertiesDockAdapter(PipelinePropertiesView):
     """Adapter that wires the PyFlow pipeline properties dock to our controller/presenter layer."""
@@ -136,6 +148,8 @@ class PipelinePropertiesDockAdapter(PipelinePropertiesView):
         self._dock = dock
         self._controller = controller
         self._widget: PipelineProperties = dock.pipeline_properties
+        self._active_name: str = ""
+        self._pending_name: str = ""
         self._name_cb: Optional[Callable[[str], None]] = None
         self._save_cb: Optional[Callable[[], None]] = None
         self._discard_cb: Optional[Callable[[], None]] = None
@@ -151,7 +165,10 @@ class PipelinePropertiesDockAdapter(PipelinePropertiesView):
     def show_pipeline(self, name: str | None) -> None:
         self._suppress_name_signal = True
         try:
-            self._widget.pipeline_name_lineEdit.setText(name or "")
+            normalized = (name or "").strip()
+            self._active_name = normalized
+            self._pending_name = normalized
+            self._widget.pipeline_name_lineEdit.setText(normalized)
         finally:
             self._suppress_name_signal = False
 
@@ -174,15 +191,17 @@ class PipelinePropertiesDockAdapter(PipelinePropertiesView):
     def _on_name_edited(self, text: str) -> None:
         if self._suppress_name_signal:
             return
-        if self._controller:
-            self._controller.rename_active(text)
-            return
+        self._pending_name = text
         if self._name_cb:
             self._name_cb(text)
 
     def _on_save_clicked(self) -> None:
         if self._controller:
-            self._controller.save_active()
+            staged = self._pending_name.strip()
+            baseline = staged or self._active_name
+            self._controller.save_properties(baseline)
+            # Treat the staged value as the new baseline until presenters rehydrate.
+            self._active_name = baseline
             return
         if self._save_cb:
             self._save_cb()
@@ -190,6 +209,6 @@ class PipelinePropertiesDockAdapter(PipelinePropertiesView):
     def _on_discard_clicked(self) -> None:
         if self._controller:
             self._controller.discard_changes()
-            return
-        if self._discard_cb:
+        elif self._discard_cb:
             self._discard_cb()
+        self.show_pipeline(self._active_name)

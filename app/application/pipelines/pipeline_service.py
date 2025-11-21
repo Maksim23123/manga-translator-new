@@ -64,10 +64,20 @@ class PipelineService:
 
     def create(self, name: str) -> PipelineUnit:
         draft_pointer = GraphPointer(final_path=None, status=GraphPointerStatus.MISSING)
+        previous_active = self._collection.active
         pipeline = self._collection.add_with_name(name, draft_pointer)
         self._metadata_repo.save(self._collection)
         self._publish(PipelineAdded(pipeline.name))
         self._publish(PipelineListUpdated([p.name for p in self._collection.list()]))
+
+        active = self._collection.active
+        if previous_active is not active:
+            self._publish(ActivePipelineChanged(active.name if active else None))
+            if active and active.graph.active_path():
+                self._pyflow.load_graph(active.graph.active_path())  # type: ignore[arg-type]
+            else:
+                self._pyflow.new_blank()
+
         return pipeline
 
     def rename(self, old_name: str, new_name: str) -> PipelineUnit:

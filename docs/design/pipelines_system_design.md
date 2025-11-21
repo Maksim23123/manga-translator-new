@@ -63,6 +63,7 @@ Participants: Assistant (Codex), Makss
 - 2025-10-29 - Drafted pipelines system architecture covering domain/application structure, PyFlow integration strategy, persistence model, and testing plan.
 - 2025-10-30 - Added interim Graph Editor tab wiring legacy PyFlow add-on in stripped-down mode pending full pipeline refactor.
 - 2025-11-20 - Wired PyFlow dock list/properties via framework adapters and presenters/controllers, added deferred PyFlow gateway and local graph storage under `data/pipelines/`, composed the pipelines bundle inside the tab factory, and introduced tests for storage promotion and dock adapters.
+- 2025-11-21 - Prompt pipeline name on creation through the PyFlow pipelines list dock to align with legacy/doc-unit UX.
 
 ## 10. Presentation Wiring Conventions
 - Prefer the view-owned wiring already used in doc-units: framework widgets receive controllers and presenters, call controller methods in response to UI events, and attach themselves to presenters (controllers remain view-agnostic).

@@ -9,9 +9,9 @@ class PipelineListController:
     def __init__(self, *, service: PipelineService) -> None:
         self._service = service
 
-    def create_pipeline(self) -> None:
-        """Create a new pipeline using the default naming strategy."""
-        self._service.create("Pipeline")
+    def create_pipeline(self, name: str) -> None:
+        """Create a new pipeline using a user-provided name."""
+        self._service.create(name)
 
     def select_pipeline(self, name: str) -> None:
         self._service.set_active(name)
