@@ -118,7 +118,10 @@ def build_graph_editor_tab(
         if project_store:
             project_data = project_store.get_data()
             project_root = Path(project_data.metadata.get("project_root_path")) if project_data and project_data.metadata.get("project_root_path") else None
-            service.configure_storage(project_root)
+            project_id = project_data.project_id.value if project_data else None
+            project_meta_path_raw = project_data.metadata.get("project_meta_path") if project_data else None
+            project_meta_path = Path(project_meta_path_raw) if project_meta_path_raw else None
+            service.configure_storage(project_root, project_id=project_id, project_meta_path=project_meta_path)
         active = service.collection.active
         if active and active.is_dirty:
             try:
@@ -126,6 +129,7 @@ def build_graph_editor_tab(
             except Exception as ex:  # pragma: no cover - depends on PyFlow/runtime FS
                 log.error("Failed to save active pipeline '%s' before promotion: %s", active.name, ex)
         service.promote_all()
+        service.cleanup_after_save()
 
     return GraphEditorTabBundle(
         tab=tab,
@@ -152,7 +156,10 @@ def _build_project_ready_callback(
         project_data = project_store.get_data()
         project_root_raw = project_data.metadata.get("project_root_path") if project_data else None
         project_root = Path(project_root_raw) if project_root_raw else None
-        service.configure_storage(project_root)
+        project_id = project_data.project_id.value if project_data else None
+        project_meta_path_raw = project_data.metadata.get("project_meta_path") if project_data else None
+        project_meta_path = Path(project_meta_path_raw) if project_meta_path_raw else None
+        service.configure_storage(project_root, project_id=project_id, project_meta_path=project_meta_path)
         service.load()
 
     return _callback

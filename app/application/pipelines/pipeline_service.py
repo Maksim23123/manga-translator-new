@@ -55,9 +55,15 @@ class PipelineService:
     def collection(self) -> PipelineCollection:
         return self._collection
 
-    def configure_storage(self, project_root: Optional[Path]) -> None:
+    def configure_storage(
+        self,
+        project_root: Optional[Path],
+        project_id: Optional[str] = None,
+        project_meta_path: Optional[Path] = None,
+    ) -> None:
         """Point storage at the project root or reset to fallback."""
-        self._storage.set_project_root(project_root)
+        self._storage.set_project_context(project_root, project_id=project_id, project_meta_path=project_meta_path)
+        self._storage.cleanup_shared_temp()
 
     def load(self) -> PipelineCollection:
         if self._active_store:
@@ -81,6 +87,7 @@ class PipelineService:
             self._pyflow.new_blank()
             self._publish(ActivePipelineChanged(None))
 
+        self._cleanup_orphans()
         return self._collection
 
     def create(self, name: str) -> PipelineUnit:
@@ -212,3 +219,18 @@ class PipelineService:
 
     def _publish(self, event) -> None:
         self._events.publish(event)
+
+    def _cleanup_orphans(self) -> None:
+        try:
+            expected = {p.name for p in self._collection.list()}
+            self._storage.cleanup_project_orphans(expected)
+        except Exception:
+            log.debug("Failed to cleanup pipeline orphans", exc_info=True)
+
+    def cleanup_after_save(self) -> None:
+        """Prune temp/final orphans and remove shared temp for current project."""
+        self._cleanup_orphans()
+        try:
+            self._storage.cleanup_current_shared_temp()
+        except Exception:
+            log.debug("Failed to cleanup shared temp after save", exc_info=True)

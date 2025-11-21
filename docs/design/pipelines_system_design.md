@@ -30,11 +30,12 @@ Participants: Assistant (Codex), Makss
 ## 4. Data & Storage
 - Project metadata: pipelines serialize into the existing project meta file (e.g., `project_meta.json`) under a dedicated `pipelines` key containing the list of pipeline entries. Each entry stores the pipeline name plus a `graph_pointer` structure (status, final path hint, temp draft path) so we can reuse the same promotion pattern as doc-unit assets. The active pipeline is not persisted; it is tracked transiently to mirror doc-units.
 - Graph artifacts: `.pygraph` files written initially into `<project>/temp/pipelines/` (draft) while editing; on project save the draft file is promoted into `<project>/pipelines/` and the pointer status flips to `final`. Naming still follows collision-free rules (e.g., `Pipeline (2).pygraph`). Current stub storage writes to `data/pipelines/` (with `drafts/` subfolder) until project-level integration arrives.
-- Pre-project fallback: when there is no project path yet (e.g., new project before first save), write drafts to a shared temp root (e.g., `data/temp/pipelines` or an OS cache dir); on first save, switch the base to `<project>/temp/pipelines/`, promote drafts to `<project>/pipelines/`, and periodically sweep the shared temp root to avoid orphans.
+- Pre-project fallback: when there is no project path yet (e.g., new project before first save), write drafts to a shared temp root (e.g., `data/temp/pipelines` or an OS cache dir). Use per-project subfolders within the shared root (e.g., `data/temp/pipelines/<project_id_or_hash>/`) to isolate drafts; on first save, switch the base to `<project>/temp/pipelines/`, promote drafts to `<project>/pipelines/`, then delete that subfolder if promotion succeeds.
 - In-memory caches: application keeps a `PipelineCollection` for the current project and tracks the active `PipelineUnit` via an `ActivePipelineStore` (transient, not persisted). PyFlow instance holds the live graph. The interaction manager resolves pointers to decide whether to load draft or final files.
 - Active switch rule: when changing the active pipeline, persist the current pipeline’s graph to its draft path before switching (at minimum when marked dirty), then load the newly selected pipeline into PyFlow. Active selection resets on project load/create.
 - Cleanup rules: deleting a pipeline queues its draft/final graph files for removal; project switching clears cached state, removes orphaned drafts, and resets PyFlow to a blank graph.
 - Promotion semantics: on project save, promote draft graphs into `<project>/pipelines/`, update graph pointers to `final`, replace prior finals, and if promotion fails keep the existing final and surface/log the error instead of leaving the pipeline unusable.
+- Orphan cleanup: on startup sweep stale per-project temp subfolders in the shared root for projects not mounted; on save, after successful promotion, delete the current project’s shared-temp subfolder. Also prune orphaned drafts/finals inside `<project>/temp/pipelines/` and `<project>/pipelines/` whose names do not exist in the pipeline collection, guarding against deleting any in-use files.
 
 ## 5. Events & Communication
 - Pipeline event bus (mirrors doc-unit pattern) emits: `PipelineListUpdated`, `PipelineAdded`, `PipelineRemoved`, `PipelineRenamed`, `ActivePipelineChanged`, `PipelineGraphDirtyChanged`, and `PreviewImagePathChanged`.
@@ -65,6 +66,7 @@ Participants: Assistant (Codex), Makss
 - [ ] Refactor PyFlow dock tool preview wiring and replace legacy add-on shims once pipeline ports land; remove dependency guards when real implementations are available.
 - [ ] Add automated tests for full service flow (create/rename/delete/set-active) and preview persistence round-trips.
 - [ ] Add `ActivePipelineStore` port + memory impl to keep active selection transient (not persisted) in parity with doc-units.
+- [x] Add per-project shared temp subfolders, orphan cleanup (shared + project temp/finals), and guards around promotion failure.
 
 ## 9. Changelog
 - 2025-10-29 - Drafted pipelines system architecture covering domain/application structure, PyFlow integration strategy, persistence model, and testing plan.
@@ -72,6 +74,7 @@ Participants: Assistant (Codex), Makss
 - 2025-11-20 - Wired PyFlow dock list/properties via framework adapters and presenters/controllers, added deferred PyFlow gateway and local graph storage under `data/pipelines/`, composed the pipelines bundle inside the tab factory, and introduced tests for storage promotion and dock adapters.
 - 2025-11-21 - Prompt pipeline name on creation through the PyFlow pipelines list dock to align with legacy/doc-unit UX.
 - 2025-11-22 - Introduced shared project lifecycle event bus for dirty tracking and moved active pipeline tracking to a transient store (not persisted).
+- 2025-11-23 - Implemented per-project shared temp isolation and orphan cleanup for pipeline drafts/finals.
 
 ## 10. Presentation Wiring Conventions
 - Prefer the view-owned wiring already used in doc-units: framework widgets receive controllers and presenters, call controller methods in response to UI events, and attach themselves to presenters (controllers remain view-agnostic).

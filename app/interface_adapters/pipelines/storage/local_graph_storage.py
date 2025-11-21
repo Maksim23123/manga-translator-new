@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import shutil
+import hashlib
 from pathlib import Path
 from typing import Optional
 
@@ -12,24 +13,40 @@ log = logging.getLogger(__name__)
 
 
 class LocalGraphStorage(GraphStoragePort):
-    """Stores pipeline graphs on disk with project-aware paths."""
+    """Stores pipeline graphs on disk with project-aware paths.
+
+    Drafts use a shared temp root with per-project subfolders until a project root is
+    known, then switch to project-local temp. Finals always live under the project root
+    when available, otherwise fall back to the shared finals dir.
+    """
 
     def __init__(self, finals_dir: Path, drafts_dir: Optional[Path] = None) -> None:
         self._fallback_finals_dir = finals_dir
-        self._fallback_drafts_dir = drafts_dir or finals_dir / "drafts"
+        self._shared_temp_root = drafts_dir or finals_dir / "drafts"
 
         self._finals_dir = self._fallback_finals_dir
-        self._drafts_dir = self._fallback_drafts_dir
+        self._drafts_dir = self._shared_temp_root / "default"
+        self._project_key = "default"
+        self._project_root: Optional[Path] = None
         self._ensure_dirs()
 
-    def set_project_root(self, project_root: Optional[Path]) -> None:
-        """Point drafts/finals to a project root or revert to fallback."""
+    def set_project_context(
+        self,
+        project_root: Optional[Path],
+        project_id: Optional[str] = None,
+        project_meta_path: Optional[Path] = None,
+    ) -> None:
+        """Point drafts/finals to a project root or project-scoped shared temp."""
+        self._project_root = project_root
+        self._project_key = self._make_project_key(project_id, project_meta_path, project_root)
+
         if project_root:
             self._finals_dir = project_root / "pipelines"
             self._drafts_dir = project_root / "temp" / "pipelines"
         else:
             self._finals_dir = self._fallback_finals_dir
-            self._drafts_dir = self._fallback_drafts_dir
+            self._drafts_dir = self._shared_temp_root / self._project_key
+
         self._ensure_dirs()
 
     def draft_path_for(self, pipeline_name: str) -> Path:
@@ -99,6 +116,60 @@ class LocalGraphStorage(GraphStoragePort):
                     path.unlink()
                 except Exception:
                     pass
+
+    def cleanup_shared_temp(self) -> None:
+        """Remove per-project temp folders in the shared root except current project."""
+        try:
+            self._shared_temp_root.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            return
+
+        for child in self._shared_temp_root.iterdir():
+            if not child.is_dir():
+                continue
+            if child.name == self._project_key:
+                continue
+            try:
+                shutil.rmtree(child, ignore_errors=True)
+            except Exception:
+                log.debug("Failed to remove stale shared temp folder %s", child)
+
+    def cleanup_current_shared_temp(self) -> None:
+        """Delete the current project's shared temp folder (after successful promotion)."""
+        candidate = self._shared_temp_root / self._project_key
+        if not candidate.exists():
+            return
+        try:
+            shutil.rmtree(candidate, ignore_errors=True)
+        except Exception:
+            log.debug("Failed to remove shared temp folder %s", candidate)
+
+    def cleanup_project_orphans(self, expected_names: set[str]) -> None:
+        """Delete draft/final files not present in the pipeline collection."""
+        expected_files = {f"{name}.pygraph" for name in expected_names}
+        for folder in (self._drafts_dir, self._finals_dir):
+            if not folder.exists():
+                continue
+            for item in folder.glob("*.pygraph"):
+                if item.name not in expected_files:
+                    try:
+                        item.unlink()
+                    except Exception:
+                        log.debug("Failed to remove orphaned pipeline graph %s", item)
+
+    def _make_project_key(
+        self,
+        project_id: Optional[str],
+        project_meta_path: Optional[Path],
+        project_root: Optional[Path],
+    ) -> str:
+        if project_id:
+            return project_id
+        candidate = project_meta_path or project_root
+        if candidate:
+            digest = hashlib.sha1(str(candidate).encode("utf-8"), usedforsecurity=False).hexdigest()  # noqa: S324 - non-security hash for folder names
+            return digest[:12]
+        return "default"
 
     def _ensure_dirs(self) -> None:
         self._finals_dir.mkdir(parents=True, exist_ok=True)
