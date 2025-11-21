@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import logging
 from typing import Optional
 
 from app.application.pipelines.events import (
@@ -17,6 +18,8 @@ from app.application.pipelines.ports import GraphStoragePort, PipelineMetadataRe
 from app.domain.pipelines.graph_pointer import GraphPointer, GraphPointerStatus
 from app.domain.pipelines.pipeline_collection import PipelineCollection
 from app.domain.pipelines.pipeline_unit import PipelineUnit
+
+log = logging.getLogger(__name__)
 
 
 class PipelineService:
@@ -43,6 +46,10 @@ class PipelineService:
     @property
     def collection(self) -> PipelineCollection:
         return self._collection
+
+    def configure_storage(self, project_root: Optional[Path]) -> None:
+        """Point storage at the project root or reset to fallback."""
+        self._storage.set_project_root(project_root)
 
     def load(self) -> PipelineCollection:
         self._collection = self._metadata_repo.load()
@@ -129,16 +136,39 @@ class PipelineService:
             return None
 
         target_path = self._storage.draft_path_for(active.name)
+        log.debug("Saving active pipeline '%s' to draft %s", active.name, target_path)
         self._pyflow.save_graph(target_path)
 
-        promoted_pointer = self._storage.promote(active.graph.mark_draft(target_path))
-        active.update_graph(promoted_pointer)
+        draft_pointer = active.graph.mark_draft(target_path)
+        active.update_graph(draft_pointer)
         active.clear_dirty()
 
         self._metadata_repo.save(self._collection)
-        self._publish(PipelineGraphPointerUpdated(active.name, promoted_pointer))
+        self._publish(PipelineGraphPointerUpdated(active.name, draft_pointer))
         self._publish(PipelineGraphDirtyChanged(active.name, active.is_dirty))
         return active
+
+    def promote_all(self) -> list[PipelineUnit]:
+        """Promote all draft graphs to finals; keep old finals on failure."""
+        promoted: list[PipelineUnit] = []
+        for pipeline in self._collection.list():
+            pointer = pipeline.graph
+            if pointer.status != GraphPointerStatus.DRAFT or not pointer.draft_path:
+                continue
+            try:
+                promoted_pointer = self._storage.promote(pointer)
+            except Exception as ex:
+                log.exception("Failed to promote draft graph for pipeline '%s': %s", pipeline.name, ex)
+                continue
+
+            pipeline.update_graph(promoted_pointer)
+            pipeline.clear_dirty()
+            self._metadata_repo.save(self._collection)
+            self._publish(PipelineGraphPointerUpdated(pipeline.name, promoted_pointer))
+            self._publish(PipelineGraphDirtyChanged(pipeline.name, pipeline.is_dirty))
+            log.info("Promoted pipeline '%s' draft to final %s", pipeline.name, promoted_pointer.final_path)
+            promoted.append(pipeline)
+        return promoted
 
     def update_preview(self, image_path: Path) -> Optional[Path]:
         active = self._collection.active

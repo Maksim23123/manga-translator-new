@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable, Optional
 
+from app.application.project.ports import CurrentProjectStore
 from app.application.pipelines.events import PipelineEventBus
 from app.application.pipelines.pipeline_service import PipelineService
 from app.frameworks.pyside6_gui.tabs.pipelines.graph_editor_tab import GraphEditorTab
@@ -22,6 +25,8 @@ from app.interface_adapters.pipelines.repositories.mem_pipeline_metadata_reposit
 )
 from app.interface_adapters.pipelines.storage.local_graph_storage import LocalGraphStorage
 
+log = logging.getLogger(__name__)
+
 
 @dataclass(slots=True)
 class GraphEditorTabBundle:
@@ -34,6 +39,7 @@ class GraphEditorTabBundle:
     pipeline_list_presenter: PipelineListPresenter | None = None
     pipeline_properties_controller: PipelinePropertiesController | None = None
     pipeline_properties_presenter: PipelinePropertiesPresenter | None = None
+    finalize_pipelines: Callable[[], None] | None = None
 
 
 def build_graph_editor_tab(
@@ -42,11 +48,13 @@ def build_graph_editor_tab(
     pipeline_list_presenter: PipelineListPresenter | None = None,
     pipeline_properties_controller: PipelinePropertiesController | None = None,
     pipeline_properties_presenter: PipelinePropertiesPresenter | None = None,
+    project_store: Optional[CurrentProjectStore] = None,
 ) -> GraphEditorTabBundle:
     """Constructs the PyFlow-backed graph editor tab."""
     event_bus = PipelineEventBus()
     metadata_repo = MemPipelineMetadataRepository()
-    graph_storage = LocalGraphStorage(Path("data") / "pipelines")
+    shared_temp_root = Path("data") / "temp" / "pipelines"
+    graph_storage = LocalGraphStorage(finals_dir=Path("data") / "pipelines", drafts_dir=shared_temp_root)
     pyflow_gateway = DeferredPyFlowGateway()
 
     service = PipelineService(
@@ -67,7 +75,7 @@ def build_graph_editor_tab(
     )
     pipeline_list_presenter = pipeline_list_presenter or PipelineListPresenter(
         event_bus=event_bus,
-        collection=service.collection,
+        collection_provider=lambda: service.collection,
     )
 
     # Pipeline properties dock wiring
@@ -76,7 +84,7 @@ def build_graph_editor_tab(
     )
     pipeline_properties_presenter = pipeline_properties_presenter or PipelinePropertiesPresenter(
         event_bus=event_bus,
-        collection=service.collection,
+        collection_provider=lambda: service.collection,
     )
 
     # Build tab and wire PyFlow gateway delegate.
@@ -87,8 +95,25 @@ def build_graph_editor_tab(
         pipeline_list_presenter=pipeline_list_presenter,
         pipeline_properties_controller=pipeline_properties_controller,
         pipeline_properties_presenter=pipeline_properties_presenter,
+        project_ready_callback=_build_project_ready_callback(
+            project_store=project_store,
+            service=service,
+        ),
     )
     pyflow_gateway.set_delegate(tab.pyflow_wrapper)
+
+    def finalize_pipelines() -> None:
+        if project_store:
+            project_data = project_store.get_data()
+            project_root = Path(project_data.metadata.get("project_root_path")) if project_data and project_data.metadata.get("project_root_path") else None
+            service.configure_storage(project_root)
+        active = service.collection.active
+        if active and active.is_dirty:
+            try:
+                service.save_active()
+            except Exception as ex:  # pragma: no cover - depends on PyFlow/runtime FS
+                log.error("Failed to save active pipeline '%s' before promotion: %s", active.name, ex)
+        service.promote_all()
 
     return GraphEditorTabBundle(
         tab=tab,
@@ -100,4 +125,22 @@ def build_graph_editor_tab(
         pipeline_list_presenter=pipeline_list_presenter,
         pipeline_properties_controller=pipeline_properties_controller,
         pipeline_properties_presenter=pipeline_properties_presenter,
+        finalize_pipelines=finalize_pipelines,
     )
+
+
+def _build_project_ready_callback(
+    *,
+    project_store: Optional[CurrentProjectStore],
+    service: PipelineService,
+) -> Callable[[], None]:
+    def _callback() -> None:
+        if not project_store:
+            return
+        project_data = project_store.get_data()
+        project_root_raw = project_data.metadata.get("project_root_path") if project_data else None
+        project_root = Path(project_root_raw) if project_root_raw else None
+        service.configure_storage(project_root)
+        service.load()
+
+    return _callback

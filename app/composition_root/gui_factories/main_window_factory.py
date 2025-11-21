@@ -39,7 +39,9 @@ def build_main_window() -> MainWindow:
     doc_unit_tab = doc_unit_bundle.tab
     doc_unit_event_bus = doc_unit_bundle.event_bus
 
-    graph_editor_bundle: GraphEditorTabBundle = build_graph_editor_tab()
+    graph_editor_bundle: GraphEditorTabBundle = build_graph_editor_tab(
+        project_store=mem_current_project_store,
+    )
     graph_editor_tab = graph_editor_bundle.tab
 
     create_project_use_case = CreateProject(mem_current_project_store, id_generator)
@@ -66,6 +68,7 @@ def build_main_window() -> MainWindow:
         project_settings_store,
         doc_unit_event_bus=doc_unit_event_bus,
         finalize_doc_unit_assets=doc_unit_bundle.finalize_assets,
+        finalize_pipeline_assets=graph_editor_bundle.finalize_pipelines,
         project_ready_callbacks=[
             doc_unit_tab.on_project_available,
             graph_editor_tab.on_project_available,

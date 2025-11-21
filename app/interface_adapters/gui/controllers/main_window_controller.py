@@ -36,6 +36,7 @@ class MainWindowController:
         project_settings_store: ProjectSettingsStore,
         doc_unit_event_bus: DocUnitEventBus,
         finalize_doc_unit_assets: FinalizeDocUnitAssets | None = None,
+        finalize_pipeline_assets: Optional[Callable[[], None]] = None,
         project_ready_callbacks: Optional[Sequence[Callable[[], None]]] = None,
     ) -> None:
         self._presenter = presenter
@@ -45,6 +46,7 @@ class MainWindowController:
         self._project_settings_store = project_settings_store
         self._project_ready_callbacks = list(project_ready_callbacks or [])
         self._finalize_doc_unit_assets = finalize_doc_unit_assets
+        self._finalize_pipeline_assets = finalize_pipeline_assets
         self._doc_unit_event_bus = doc_unit_event_bus
 
     def on_new_project_triggered(self) -> None:
@@ -115,6 +117,12 @@ class MainWindowController:
             project_root_path = project_data.metadata.get("project_root_path") if project_data else None
             if not project_root_path:
                 raise ProjectSaveLocationUndefinedError("Project root path is undefined.")
+
+            if self._finalize_pipeline_assets:
+                try:
+                    self._finalize_pipeline_assets()
+                except Exception as ex:
+                    log.error("Pipeline asset finalization failed: %s", ex)
 
             if self._finalize_doc_unit_assets:
                 self._finalize_doc_unit_assets.execute()

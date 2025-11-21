@@ -4,13 +4,17 @@ from pathlib import Path
 
 from app.application.pipelines.events import ActivePipelineChanged, PipelineEventBus
 from app.application.pipelines.pipeline_service import PipelineService
-from app.domain.pipelines.graph_pointer import GraphPointer
+from app.domain.pipelines.graph_pointer import GraphPointer, GraphPointerStatus
 from app.interface_adapters.pipelines.repositories.mem_pipeline_metadata_repository import (
     MemPipelineMetadataRepository,
 )
 
 
 class StubGraphStorage:
+    def __init__(self, *, fail_promote: bool = False) -> None:
+        self.fail_promote = fail_promote
+        self.promote_calls: list[GraphPointer] = []
+
     def draft_path_for(self, pipeline_name: str) -> Path:
         return Path(f"{pipeline_name}.draft")
 
@@ -18,7 +22,12 @@ class StubGraphStorage:
         return Path(f"{pipeline_name}.final")
 
     def promote(self, pointer: GraphPointer) -> GraphPointer:
-        return pointer
+        self.promote_calls.append(pointer)
+        if self.fail_promote:
+            raise RuntimeError("promote failed")
+        draft = pointer.draft_path or self.draft_path_for("unknown")
+        final_path = self.final_path_for(draft.stem)
+        return GraphPointer(final_path=final_path, draft_path=None, status=GraphPointerStatus.FINAL)
 
     def delete_graph(self, pointer: GraphPointer) -> None:  # pragma: no cover - not used here
         pass
@@ -103,3 +112,59 @@ def test_set_active_saves_previous_dirty_pipeline() -> None:
     assert pyflow_gateway.save_graph_calls == [Path("Pipeline.draft")]
     assert service.collection.active and service.collection.active.name == "Another Pipeline"
     assert not first.is_dirty
+
+
+def test_save_active_marks_pointer_as_draft() -> None:
+    event_bus = PipelineEventBus()
+    pyflow_gateway = StubPyFlowGateway()
+    service = _build_service(event_bus, pyflow_gateway)
+
+    pipeline = service.create("Pipeline")
+    pipeline.mark_dirty()
+
+    saved = service.save_active()
+
+    assert saved is pipeline
+    assert saved.graph.status is GraphPointerStatus.DRAFT
+    assert saved.graph.draft_path == Path("Pipeline.draft")
+    assert not saved.is_dirty
+
+
+def test_promote_all_updates_pointer_and_keeps_drafts_on_failure() -> None:
+    event_bus = PipelineEventBus()
+    pyflow_gateway = StubPyFlowGateway()
+    storage = StubGraphStorage()
+    service = PipelineService(
+        metadata_repo=MemPipelineMetadataRepository(),
+        storage=storage,
+        pyflow_gateway=pyflow_gateway,
+        preview_port=None,
+        event_bus=event_bus,
+    )
+
+    pipeline = service.create("Pipeline")
+    pipeline.mark_dirty()
+    service.save_active()
+
+    promoted = service.promote_all()
+
+    assert promoted == [pipeline]
+    assert pipeline.graph.status is GraphPointerStatus.FINAL
+    assert pipeline.graph.final_path == Path("Pipeline.final")
+
+    failing_storage = StubGraphStorage(fail_promote=True)
+    failing_service = PipelineService(
+        metadata_repo=MemPipelineMetadataRepository(),
+        storage=failing_storage,
+        pyflow_gateway=pyflow_gateway,
+        preview_port=None,
+        event_bus=event_bus,
+    )
+    pipeline2 = failing_service.create("Other")
+    pipeline2.mark_dirty()
+    failing_service.save_active()
+
+    promoted_fail = failing_service.promote_all()
+
+    assert promoted_fail == []
+    assert pipeline2.graph.status is GraphPointerStatus.DRAFT

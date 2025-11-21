@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Callable, Optional
 
 from PySide6.QtWidgets import QWidget
 
@@ -34,12 +34,14 @@ class GraphEditorTab(Tab):
         pipeline_properties_controller: Optional[PipelinePropertiesController] = None,
         pipeline_properties_presenter: Optional[PipelinePropertiesPresenter] = None,
         parent: Optional[QWidget] = None,
+        project_ready_callback: Optional[Callable[[], None]] = None,
     ) -> None:
         super().__init__(parent)
         self.set_tab_name(self._default_tab_name)
 
         self._presenter = presenter
         self._controller = controller
+        self._project_ready_callback = project_ready_callback
 
         # Expose the default PyFlow menu bar for debugging. Toggle back once pipeline
         # orchestration is wired and custom menus land.
@@ -61,9 +63,13 @@ class GraphEditorTab(Tab):
         return self._pyflow_wrapper
 
     def on_project_available(self) -> None:
-        """Placeholder hook for project lifecycle events."""
-        # Future implementation will load the active pipeline graph here.
-        pass
+        """Project lifecycle hook to wire pipelines to the current project."""
+        if self._project_ready_callback:
+            try:
+                self._project_ready_callback()
+            except Exception:
+                # Keep UI responsive even if lifecycle setup fails.
+                return
 
     def _handle_modified_changed(self, is_modified: bool) -> None:
         tab_title = f"{self._default_tab_name}*" if is_modified else self._default_tab_name
