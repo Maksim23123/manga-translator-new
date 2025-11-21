@@ -32,6 +32,14 @@ class PipelinePreviewPort(Protocol):
     def delete_preview(self, pipeline: PipelineUnit) -> None: ...
 
 
+class ActivePipelineStore(Protocol):
+    """Tracks the currently active pipeline without persisting it."""
+
+    def get_active(self) -> Optional[str]: ...
+    def set_active(self, name: Optional[str]) -> None: ...
+    def clear(self) -> None: ...
+
+
 class PyFlowGateway(Protocol):
     """UI-facing facade for manipulating the embedded PyFlow instance."""
 

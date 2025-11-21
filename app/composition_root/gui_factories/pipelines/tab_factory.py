@@ -24,9 +24,13 @@ from app.interface_adapters.pipelines.presenters.pipeline_properties_presenter i
     PipelinePropertiesPresenter,
 )
 from app.interface_adapters.pipelines.presenters.pyflow_presenter import PyFlowPresenter
+from app.interface_adapters.pipelines.repositories.project_pipeline_metadata_repository import (
+    ProjectPipelineMetadataRepository,
+)
 from app.interface_adapters.pipelines.repositories.mem_pipeline_metadata_repository import (
     MemPipelineMetadataRepository,
 )
+from app.interface_adapters.pipelines.stores.mem_active_pipeline_store import MemActivePipelineStore
 from app.interface_adapters.pipelines.storage.local_graph_storage import LocalGraphStorage
 
 log = logging.getLogger(__name__)
@@ -57,10 +61,11 @@ def build_graph_editor_tab(
 ) -> GraphEditorTabBundle:
     """Constructs the PyFlow-backed graph editor tab."""
     event_bus = PipelineEventBus()
-    metadata_repo = MemPipelineMetadataRepository()
+    metadata_repo = ProjectPipelineMetadataRepository(project_store) if project_store else MemPipelineMetadataRepository()
     shared_temp_root = Path("data") / "temp" / "pipelines"
     graph_storage = LocalGraphStorage(finals_dir=Path("data") / "pipelines", drafts_dir=shared_temp_root)
     pyflow_gateway = DeferredPyFlowGateway()
+    active_store = MemActivePipelineStore()
 
     service = PipelineService(
         metadata_repo=metadata_repo,
@@ -68,6 +73,7 @@ def build_graph_editor_tab(
         pyflow_gateway=pyflow_gateway,
         preview_port=None,
         event_bus=event_bus,
+        active_store=active_store,
     )
 
     # Core PyFlow presenters/controllers

@@ -14,7 +14,13 @@ from app.application.pipelines.events import (
     PipelineRemoved,
     PipelineRenamed,
 )
-from app.application.pipelines.ports import GraphStoragePort, PipelineMetadataRepository, PipelinePreviewPort, PyFlowGateway
+from app.application.pipelines.ports import (
+    ActivePipelineStore,
+    GraphStoragePort,
+    PipelineMetadataRepository,
+    PipelinePreviewPort,
+    PyFlowGateway,
+)
 from app.domain.pipelines.graph_pointer import GraphPointer, GraphPointerStatus
 from app.domain.pipelines.pipeline_collection import PipelineCollection
 from app.domain.pipelines.pipeline_unit import PipelineUnit
@@ -33,6 +39,7 @@ class PipelineService:
         pyflow_gateway: PyFlowGateway,
         preview_port: Optional[PipelinePreviewPort] = None,
         event_bus: Optional[PipelineEventBus] = None,
+        active_store: Optional[ActivePipelineStore] = None,
     ) -> None:
         self._metadata_repo = metadata_repo
         self._storage = storage
@@ -40,6 +47,7 @@ class PipelineService:
         self._preview_port = preview_port
         self._events = event_bus or PipelineEventBus()
         self._collection = PipelineCollection()
+        self._active_store = active_store
 
         self._pyflow.on_dirty_changed(self._on_dirty_changed)
 
@@ -52,7 +60,13 @@ class PipelineService:
         self._storage.set_project_root(project_root)
 
     def load(self) -> PipelineCollection:
+        if self._active_store:
+            self._active_store.clear()
+
         self._collection = self._metadata_repo.load()
+
+        # Reset to no active pipeline on load; selection is transient.
+        self._collection.set_active(None)
         self._publish(PipelineListUpdated([p.name for p in self._collection.list()]))
 
         active = self._collection.active
@@ -84,6 +98,8 @@ class PipelineService:
                 self._pyflow.load_graph(active.graph.active_path())  # type: ignore[arg-type]
             else:
                 self._pyflow.new_blank()
+            if self._active_store:
+                self._active_store.set_active(active.name if active else None)
 
         return pipeline
 
@@ -92,6 +108,8 @@ class PipelineService:
         self._metadata_repo.save(self._collection)
         self._publish(PipelineRenamed(old_name=old_name, new_name=new_name))
         self._publish(PipelineListUpdated([p.name for p in self._collection.list()]))
+        if self._active_store and self._active_store.get_active() == old_name:
+            self._active_store.set_active(pipeline.name)
         return pipeline
 
     def remove(self, name: str) -> PipelineUnit:
@@ -107,6 +125,8 @@ class PipelineService:
 
         active = self._collection.active
         self._publish(ActivePipelineChanged(active.name if active else None))
+        if self._active_store:
+            self._active_store.set_active(active.name if active else None)
         if active and active.graph.active_path():
             self._pyflow.load_graph(active.graph.active_path())  # type: ignore[arg-type]
         else:
@@ -122,6 +142,8 @@ class PipelineService:
         active = self._collection.set_active(name)
         self._metadata_repo.save(self._collection)
         self._publish(ActivePipelineChanged(active.name if active else None))
+        if self._active_store:
+            self._active_store.set_active(active.name if active else None)
 
         if active and active.graph.active_path():
             self._pyflow.load_graph(active.graph.active_path())  # type: ignore[arg-type]
