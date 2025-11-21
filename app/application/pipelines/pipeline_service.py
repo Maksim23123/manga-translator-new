@@ -108,6 +108,10 @@ class PipelineService:
         return removed
 
     def set_active(self, name: Optional[str]) -> Optional[PipelineUnit]:
+        previous_active = self._collection.active
+        if previous_active and previous_active.name != name and previous_active.is_dirty:
+            self.save_active()
+
         active = self._collection.set_active(name)
         self._metadata_repo.save(self._collection)
         self._publish(ActivePipelineChanged(active.name if active else None))

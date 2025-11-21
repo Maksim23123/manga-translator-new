@@ -87,3 +87,19 @@ def test_create_additional_pipeline_keeps_existing_active() -> None:
     assert active_events == []
     assert pyflow_gateway.new_blank_calls == 1
     assert not pyflow_gateway.load_graph_calls
+
+
+def test_set_active_saves_previous_dirty_pipeline() -> None:
+    event_bus = PipelineEventBus()
+    pyflow_gateway = StubPyFlowGateway()
+    service = _build_service(event_bus, pyflow_gateway)
+
+    first = service.create("Pipeline")
+    service.create("Another Pipeline")
+    first.mark_dirty()
+
+    service.set_active("Another Pipeline")
+
+    assert pyflow_gateway.save_graph_calls == [Path("Pipeline.draft")]
+    assert service.collection.active and service.collection.active.name == "Another Pipeline"
+    assert not first.is_dirty
