@@ -3,11 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Optional, Protocol
 
-from app.application.doc_units.events import (
-    ActiveDocUnitChanged,
-    DocUnitEventBus,
-    DocUnitListUpdated,
+from app.application.doc_units.events import ActiveDocUnitChanged, DocUnitEventBus, DocUnitListUpdated
+from app.application.project.lifecycle_events import (
     ProjectDirtyStateChanged,
+    ProjectLifecycleEventBus,
 )
 from app.application.doc_units.use_cases.list_doc_units import ListDocUnits
 
@@ -27,15 +26,24 @@ class DocUnitView(Protocol):
 
 
 class DocUnitPresenter:
-    def __init__(self, event_bus: DocUnitEventBus, list_use_case: ListDocUnits) -> None:
+    def __init__(
+        self,
+        event_bus: DocUnitEventBus,
+        list_use_case: ListDocUnits,
+        lifecycle_event_bus: ProjectLifecycleEventBus | None = None,
+    ) -> None:
         self._event_bus = event_bus
+        self._lifecycle_event_bus = lifecycle_event_bus
         self._list_use_case = list_use_case
         self._view: Optional[DocUnitView] = None
         self._suppress_no_project_errors = True
 
         self._event_bus.subscribe(DocUnitListUpdated, self._handle_doc_units_updated)
         self._event_bus.subscribe(ActiveDocUnitChanged, self._handle_active_changed)
-        self._event_bus.subscribe(ProjectDirtyStateChanged, self._handle_dirty_state)
+        if self._lifecycle_event_bus:
+            self._lifecycle_event_bus.subscribe(ProjectDirtyStateChanged, self._handle_dirty_state)
+        else:
+            self._event_bus.subscribe(ProjectDirtyStateChanged, self._handle_dirty_state)
 
     def attach_view(self, view: DocUnitView) -> None:
         self._view = view

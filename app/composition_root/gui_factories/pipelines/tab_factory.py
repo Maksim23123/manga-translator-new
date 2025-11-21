@@ -5,9 +5,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
 
-from app.application.project.ports import CurrentProjectStore
 from app.application.pipelines.events import PipelineEventBus
 from app.application.pipelines.pipeline_service import PipelineService
+from app.application.project.lifecycle_events import (
+    ProjectDirtyStateChanged,
+    ProjectLifecycleEventBus,
+)
+from app.application.project.ports import CurrentProjectStore
 from app.frameworks.pyside6_gui.tabs.pipelines.graph_editor_tab import GraphEditorTab
 from app.interface_adapters.pipelines.gateways.deferred_pyflow_gateway import DeferredPyFlowGateway
 from app.interface_adapters.pipelines.controllers.pipeline_list_controller import PipelineListController
@@ -49,6 +53,7 @@ def build_graph_editor_tab(
     pipeline_properties_controller: PipelinePropertiesController | None = None,
     pipeline_properties_presenter: PipelinePropertiesPresenter | None = None,
     project_store: Optional[CurrentProjectStore] = None,
+    lifecycle_event_bus: ProjectLifecycleEventBus | None = None,
 ) -> GraphEditorTabBundle:
     """Constructs the PyFlow-backed graph editor tab."""
     event_bus = PipelineEventBus()
@@ -101,6 +106,7 @@ def build_graph_editor_tab(
         ),
     )
     pyflow_gateway.set_delegate(tab.pyflow_wrapper)
+    _bridge_pipeline_dirty(event_bus, lifecycle_event_bus)
 
     def finalize_pipelines() -> None:
         if project_store:
@@ -144,3 +150,33 @@ def _build_project_ready_callback(
         service.load()
 
     return _callback
+
+
+def _bridge_pipeline_dirty(
+    pipeline_event_bus: PipelineEventBus,
+    lifecycle_event_bus: ProjectLifecycleEventBus | None,
+) -> None:
+    """Forward pipeline mutations to the shared project lifecycle bus."""
+    if not lifecycle_event_bus:
+        return
+
+    def _mark_dirty(_event) -> None:
+        lifecycle_event_bus.publish(ProjectDirtyStateChanged(True))
+
+    from app.application.pipelines.events import (
+        PipelineAdded,
+        PipelineGraphDirtyChanged,
+        PipelineGraphPointerUpdated,
+        PipelineRemoved,
+        PipelineRenamed,
+    )
+
+    def _handle_dirty_changed(event: PipelineGraphDirtyChanged) -> None:
+        if event.is_dirty:
+            _mark_dirty(event)
+
+    pipeline_event_bus.subscribe(PipelineGraphDirtyChanged, _handle_dirty_changed)
+    pipeline_event_bus.subscribe(PipelineAdded, _mark_dirty)
+    pipeline_event_bus.subscribe(PipelineRemoved, _mark_dirty)
+    pipeline_event_bus.subscribe(PipelineRenamed, _mark_dirty)
+    pipeline_event_bus.subscribe(PipelineGraphPointerUpdated, _mark_dirty)

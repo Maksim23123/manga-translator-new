@@ -26,6 +26,7 @@ from app.application.doc_units.use_cases.finalize_doc_unit_assets import (
 )
 from app.application.doc_units.ports import ActiveDocUnitStore
 from app.application.project.ports import CurrentProjectStore, IdGenerator
+from app.application.project.lifecycle_events import ProjectLifecycleEventBus, ProjectDirtyStateChanged
 from app.frameworks.pyside6_gui.tabs.doc_units.doc_unit_tab import DocUnitTab
 from app.interface_adapters.doc_units.controllers.doc_unit_controller import (
     DocUnitController,
@@ -64,13 +65,14 @@ def build_doc_unit_tab(
     project_store: CurrentProjectStore,
     id_generator: IdGenerator,
     active_store: ActiveDocUnitStore | None = None,
+    lifecycle_event_bus: ProjectLifecycleEventBus | None = None,
 ) -> DocUnitTabBundle:
     doc_unit_repository = ProjectDocUnitRepository(project_store)
     active_doc_unit_store = active_store or MemActiveDocUnitStore()
     event_bus = DocUnitEventBus()
 
     list_use_case = ListDocUnits(doc_unit_repository)
-    presenter = DocUnitPresenter(event_bus, list_use_case)
+    presenter = DocUnitPresenter(event_bus, list_use_case, lifecycle_event_bus=lifecycle_event_bus)
 
     create_use_case = CreateDocUnit(
         repository=doc_unit_repository,
@@ -163,8 +165,23 @@ def build_doc_unit_tab(
         hierarchy_details_presenter=hierarchy_details_presenter,
     )
 
+    if lifecycle_event_bus:
+        _bridge_dirty_events(event_bus, lifecycle_event_bus)
+
     return DocUnitTabBundle(
         tab=tab,
         finalize_assets=finalize_assets_use_case,
         event_bus=event_bus,
     )
+
+
+def _bridge_dirty_events(
+    source_bus: DocUnitEventBus,
+    lifecycle_bus: ProjectLifecycleEventBus,
+) -> None:
+    """Forward doc-unit dirty notifications onto the lifecycle bus."""
+
+    def _forward(event: ProjectDirtyStateChanged) -> None:
+        lifecycle_bus.publish(event)
+
+    source_bus.subscribe(ProjectDirtyStateChanged, _forward)

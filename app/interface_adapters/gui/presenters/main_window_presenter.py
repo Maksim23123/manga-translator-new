@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from typing import Optional
 
-from app.application.doc_units.events import DocUnitEventBus, ProjectDirtyStateChanged
+from app.application.project.lifecycle_events import (
+    ProjectDirtyStateChanged,
+    ProjectLifecycleEventBus,
+)
 from app.application.project.ports import CurrentProjectStore
 from app.domain.project.value_objects import ProjectData
 
@@ -13,11 +16,11 @@ class MainWindowPresenter:
     def __init__(
         self,
         project_store: CurrentProjectStore,
-        event_bus: DocUnitEventBus,
+        lifecycle_event_bus: ProjectLifecycleEventBus,
         window_name_prefix: str = "Manga Translator",
     ) -> None:
         self._project_store = project_store
-        self._event_bus = event_bus
+        self._event_bus = lifecycle_event_bus
         self._window_name_prefix = window_name_prefix
         self._is_dirty = False
         self.view: Optional[MainWindowView] = None

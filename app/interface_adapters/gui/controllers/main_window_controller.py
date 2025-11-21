@@ -5,10 +5,6 @@ from typing import Callable, Optional, Sequence
 from app.application.doc_units.use_cases.finalize_doc_unit_assets import (
     FinalizeDocUnitAssets,
 )
-from app.application.doc_units.events import (
-    DocUnitEventBus,
-    ProjectDirtyStateChanged,
-)
 from app.application.project.use_cases.create_project import CreateProject
 from app.application.project.use_cases.save_project import SaveProject
 from app.application.project.use_cases.load_project import LoadProject
@@ -19,6 +15,10 @@ from app.application.project.dto import (
 )
 from app.application.project.errors import ProjectSaveLocationUndefinedError
 from app.application.project.ports import ProjectSettingsStore
+from app.application.project.lifecycle_events import (
+    ProjectDirtyStateChanged,
+    ProjectLifecycleEventBus,
+)
 from app.interface_adapters.project.util.fs_names import safe_folder_name
 
 from ..presenters.main_window_presenter import MainWindowPresenter
@@ -34,7 +34,7 @@ class MainWindowController:
         save_project_use_case: SaveProject,
         load_project_use_case: LoadProject,
         project_settings_store: ProjectSettingsStore,
-        doc_unit_event_bus: DocUnitEventBus,
+        lifecycle_event_bus: ProjectLifecycleEventBus,
         finalize_doc_unit_assets: FinalizeDocUnitAssets | None = None,
         finalize_pipeline_assets: Optional[Callable[[], None]] = None,
         project_ready_callbacks: Optional[Sequence[Callable[[], None]]] = None,
@@ -47,7 +47,7 @@ class MainWindowController:
         self._project_ready_callbacks = list(project_ready_callbacks or [])
         self._finalize_doc_unit_assets = finalize_doc_unit_assets
         self._finalize_pipeline_assets = finalize_pipeline_assets
-        self._doc_unit_event_bus = doc_unit_event_bus
+        self._lifecycle_event_bus = lifecycle_event_bus
 
     def on_new_project_triggered(self) -> None:
         if project_name := self._presenter.request_project_name():
@@ -147,7 +147,7 @@ class MainWindowController:
 
     def _publish_clean_state(self) -> None:
         try:
-            self._doc_unit_event_bus.publish(ProjectDirtyStateChanged(False))
+            self._lifecycle_event_bus.publish(ProjectDirtyStateChanged(False))
         except Exception as ex:
             log.exception("Failed to publish clean state: %s", ex)
 

@@ -4,6 +4,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from typing import Callable, DefaultDict, List, Optional, Type, TypeVar
 
+from app.application.project.lifecycle_events import ProjectDirtyStateChanged
 from app.domain.doc_units.entities import HierarchyNode
 
 
@@ -15,11 +16,6 @@ class DocUnitListUpdated:
 @dataclass(slots=True)
 class ActiveDocUnitChanged:
     unit_id: Optional[str]
-
-
-@dataclass(slots=True)
-class ProjectDirtyStateChanged:
-    is_dirty: bool
 
 
 @dataclass(slots=True)

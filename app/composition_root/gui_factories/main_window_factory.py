@@ -9,6 +9,7 @@ from app.composition_root.gui_factories.pipelines.tab_factory import (
     GraphEditorTabBundle,
     build_graph_editor_tab,
 )
+from app.application.project.lifecycle_events import ProjectLifecycleEventBus
 from app.frameworks.pyside6_gui.main_window import MainWindow
 from app.interface_adapters.gui.controllers.main_window_controller import (
     MainWindowController,
@@ -31,16 +32,19 @@ def build_main_window() -> MainWindow:
     mem_current_project_store = MemCurrentProjectStore()
     fs_project_repository = FsProjectRepository()
     project_settings_store = QtProjectSettingsStore()
+    lifecycle_event_bus = ProjectLifecycleEventBus()
 
     doc_unit_bundle: DocUnitTabBundle = build_doc_unit_tab(
         project_store=mem_current_project_store,
         id_generator=id_generator,
+        lifecycle_event_bus=lifecycle_event_bus,
     )
     doc_unit_tab = doc_unit_bundle.tab
     doc_unit_event_bus = doc_unit_bundle.event_bus
 
     graph_editor_bundle: GraphEditorTabBundle = build_graph_editor_tab(
         project_store=mem_current_project_store,
+        lifecycle_event_bus=lifecycle_event_bus,
     )
     graph_editor_tab = graph_editor_bundle.tab
 
@@ -58,7 +62,7 @@ def build_main_window() -> MainWindow:
 
     presenter = MainWindowPresenter(
         project_store=mem_current_project_store,
-        event_bus=doc_unit_event_bus,
+        lifecycle_event_bus=lifecycle_event_bus,
     )
     controller = MainWindowController(
         presenter,
@@ -66,7 +70,7 @@ def build_main_window() -> MainWindow:
         save_project_use_case,
         load_project_use_case,
         project_settings_store,
-        doc_unit_event_bus=doc_unit_event_bus,
+        lifecycle_event_bus=lifecycle_event_bus,
         finalize_doc_unit_assets=doc_unit_bundle.finalize_assets,
         finalize_pipeline_assets=graph_editor_bundle.finalize_pipelines,
         project_ready_callbacks=[
