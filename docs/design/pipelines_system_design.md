@@ -68,7 +68,7 @@ Participants: Assistant (Codex), Makss
 - [ ] Add automated tests for full service flow (create/rename/delete/set-active) and preview persistence round-trips.
 - [x] Add `ActivePipelineStore` port + memory impl to keep active selection transient (not persisted) in parity with doc-units.
 - [x] Add per-project shared temp subfolders, orphan cleanup (shared + project temp/finals), and guards around promotion failure.
-- [ ] Block/disable PyFlow editing when no active pipeline is selected to mirror legacy safety.
+- [x] Block/disable PyFlow editing when no active pipeline is selected to mirror legacy safety.
 
 ## 9. Changelog
 - 2025-10-29 - Drafted pipelines system architecture covering domain/application structure, PyFlow integration strategy, persistence model, and testing plan.
@@ -79,6 +79,7 @@ Participants: Assistant (Codex), Makss
 - 2025-11-23 - Implemented per-project shared temp isolation and orphan cleanup for pipeline drafts/finals.
 - 2025-11-24 - Deferred pipeline deletion cleanup to load-time orphan sweeping, narrowed `cleanup_after_save` to shared-temp removal, and now delete drafts immediately while keeping finals on pipeline delete.
 - 2025-11-26 - Persisted pipeline metadata into project meta via the `ProjectPipelineMetadataRepository`, wired the graph editor tab into project lifecycle hooks (project-ready load, finalize/promotion before save), and bridged pipeline dirty events to the shared lifecycle bus.
+- 2025-11-27 - Disabled PyFlow canvas interactions when no active pipeline is selected, using `ActivePipelineChanged` wiring to toggle the embedded editor.
 
 ## 10. Presentation Wiring Conventions
 - Prefer the view-owned wiring already used in doc-units: framework widgets receive controllers and presenters, call controller methods in response to UI events, and attach themselves to presenters (controllers remain view-agnostic).

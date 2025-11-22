@@ -337,6 +337,17 @@ class PyFlowWrapper(QWidget, QObject):
 
     # endregion
 
+    def set_interactive(self, enabled: bool) -> None:
+        """Enable or disable interactions with the embedded PyFlow canvas."""
+        canvas = getattr(self._pyflow_instance, "canvasWidget", None)
+        if not canvas:
+            log.debug("PyFlow canvas widget not available; cannot toggle enabled=%s", enabled)
+            return
+        try:
+            canvas.setEnabled(enabled)
+        except Exception:
+            log.debug("Failed to toggle PyFlow canvas enabled=%s", enabled, exc_info=True)
+
     def _resolve_menu(self, menu_title: str) -> Optional[QMenu]:
         if menu_title in self._menu_cache and self._menu_cache[menu_title]:
             return self._menu_cache[menu_title]

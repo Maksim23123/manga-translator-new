@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
 
-from app.application.pipelines.events import PipelineEventBus
+from app.application.pipelines.events import ActivePipelineChanged, PipelineEventBus
 from app.application.pipelines.pipeline_service import PipelineService
 from app.application.project.lifecycle_events import (
     ProjectDirtyStateChanged,
@@ -113,6 +113,7 @@ def build_graph_editor_tab(
     )
     pyflow_gateway.set_delegate(tab.pyflow_wrapper)
     _bridge_pipeline_dirty(event_bus, lifecycle_event_bus)
+    _wire_pipeline_interactivity(event_bus, tab, service)
 
     def finalize_pipelines() -> None:
         if project_store:
@@ -193,3 +194,24 @@ def _bridge_pipeline_dirty(
     pipeline_event_bus.subscribe(PipelineRemoved, _mark_dirty)
     pipeline_event_bus.subscribe(PipelineRenamed, _mark_dirty)
     pipeline_event_bus.subscribe(PipelineGraphPointerUpdated, _mark_dirty)
+
+
+def _wire_pipeline_interactivity(
+    pipeline_event_bus: PipelineEventBus,
+    tab: GraphEditorTab,
+    service: PipelineService,
+) -> None:
+    """Enable/disable PyFlow interactions when active pipeline changes."""
+
+    def _toggle(event: ActivePipelineChanged) -> None:
+        try:
+            tab.pyflow_wrapper.set_interactive(bool(event.name))
+        except Exception:
+            log.debug("Failed to toggle PyFlow interactivity", exc_info=True)
+
+    pipeline_event_bus.subscribe(ActivePipelineChanged, _toggle)
+
+    try:
+        tab.pyflow_wrapper.set_interactive(service.collection.active is not None)
+    except Exception:
+        log.debug("Failed to apply initial PyFlow interactivity state", exc_info=True)
