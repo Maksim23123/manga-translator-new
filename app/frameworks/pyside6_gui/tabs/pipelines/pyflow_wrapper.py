@@ -105,7 +105,8 @@ class PyFlowWrapper(QWidget, QObject):
         self._layout.setContentsMargins(0, 0, 0, 0)
 
         self._pyflow_instance = self._setup_pyflow(pyflow_instance)
-        self._output_guard = PipelineOutputGuard(self._pyflow_instance.graphManager)
+        self._graph_manager = self._resolve_graph_manager(self._pyflow_instance.graphManager)
+        self._output_guard = PipelineOutputGuard(self._graph_manager)
         set_global_output_guard(self._output_guard)
         self._attach_output_guard_hooks()
         self._layout.addWidget(self._pyflow_instance)
@@ -146,7 +147,7 @@ class PyFlowWrapper(QWidget, QObject):
         except Exception:
             log.debug("Failed to run initial pipeline output dedupe", exc_info=True)
 
-        graph_manager = getattr(self._pyflow_instance, "graphManager", None)
+        graph_manager = getattr(self, "_graph_manager", None)
         graph_changed = getattr(graph_manager, "graphChanged", None)
         if graph_changed and hasattr(graph_changed, "connect"):
             try:
@@ -392,6 +393,19 @@ class PyFlowWrapper(QWidget, QObject):
             canvas.setEnabled(enabled)
         except Exception:
             log.debug("Failed to toggle PyFlow canvas enabled=%s", enabled, exc_info=True)
+
+    @staticmethod
+    def _resolve_graph_manager(graph_manager):
+        """Unwrap GraphManagerSingleton into the underlying GraphManager when needed."""
+        get_fn = getattr(graph_manager, "get", None)
+        if callable(get_fn):
+            try:
+                unwrapped = get_fn()
+                if unwrapped:
+                    return unwrapped
+            except Exception:
+                log.debug("Failed to unwrap GraphManagerSingleton", exc_info=True)
+        return graph_manager
 
     def _resolve_menu(self, menu_title: str) -> Optional[QMenu]:
         if menu_title in self._menu_cache and self._menu_cache[menu_title]:

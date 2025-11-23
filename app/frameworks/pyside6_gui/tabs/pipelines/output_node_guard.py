@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 try:
@@ -27,10 +27,10 @@ def get_global_output_guard() -> Optional["PipelineOutputGuard"]:
 
 
 class PipelineOutputGuard:
-    """Tracks pipeline output nodes and rejects duplicates per graph."""
+    """Tracks pipeline output nodes and rejects duplicates per root graph (including subgraphs)."""
 
     def __init__(self, graph_manager: GraphManager) -> None:
-        self._graph_manager = graph_manager
+        self._graph_manager = self._unwrap_graph_manager(graph_manager)
         self._by_graph: Dict[UUID, NodeBase] = {}
 
     def reset(self) -> None:
@@ -40,7 +40,7 @@ class PipelineOutputGuard:
     def register(self, node: NodeBase) -> bool:
         """Attempt to register a node; returns False if a graph already owns one."""
         graph = node.graph() if callable(getattr(node, "graph", None)) else None
-        graph_uid = getattr(graph, "uid", None)
+        graph_uid = self._graph_key(graph)
         if graph_uid is None:
             # If we cannot detect the graph, allow the node to exist to avoid crashes.
             return True
@@ -61,9 +61,13 @@ class PipelineOutputGuard:
         return True
 
     def dedupe_existing(self) -> None:
-        """Sweep all graphs and remove duplicate output nodes, keeping the first per graph."""
+        """Sweep all graphs and remove duplicate output nodes, keeping the first per root graph."""
+        manager = self._graph_manager
+        if manager is None or not hasattr(manager, "getAllNodes"):
+            log.debug("Pipeline output dedupe failed; graph manager not ready")
+            return
         try:
-            nodes = self._graph_manager.getAllNodes(classNameFilters=["PipelineOutputNode"])
+            nodes = manager.getAllNodes(classNameFilters=["PipelineOutputNode"])
         except Exception:
             log.debug("Pipeline output dedupe failed; graph manager not ready", exc_info=True)
             return
@@ -71,7 +75,7 @@ class PipelineOutputGuard:
         seen: Dict[UUID, NodeBase] = {}
         for node in nodes:
             graph = node.graph() if callable(getattr(node, "graph", None)) else None
-            graph_uid = getattr(graph, "uid", None)
+            graph_uid = self._graph_key(graph)
             if graph_uid is None:
                 continue
 
@@ -98,3 +102,46 @@ class PipelineOutputGuard:
             return bool(nodes and node.uid in nodes)
         except Exception:
             return True
+
+    @staticmethod
+    def _unwrap_graph_manager(graph_manager: Any) -> Any:
+        """Return the underlying GraphManager when a singleton wrapper is provided."""
+        get_fn = getattr(graph_manager, "get", None)
+        if callable(get_fn):
+            try:
+                unwrapped = get_fn()
+                if unwrapped:
+                    return unwrapped
+            except Exception:
+                log.debug("Failed to unwrap graph manager singleton", exc_info=True)
+        return graph_manager
+
+    @staticmethod
+    def _graph_key(graph: Any) -> Optional[UUID]:
+        """Use the root graph UID as the ownership key to prevent duplicates across subgraphs."""
+        if graph is None:
+            return None
+
+        # Walk up to the root graph if a parent chain exists.
+        parent = getattr(graph, "parentGraph", None)
+        try:
+            while parent is not None:
+                graph = parent
+                parent = getattr(graph, "parentGraph", None)
+        except Exception:
+            pass
+
+        uid = getattr(graph, "uid", None)
+        if uid is not None:
+            return uid
+
+        # Fallback: try graphManager root.
+        manager = getattr(graph, "graphManager", None)
+        find_root = getattr(manager, "findRootGraph", None)
+        if callable(find_root):
+            try:
+                root = find_root()
+                return getattr(root, "uid", None)
+            except Exception:
+                log.debug("Failed to resolve root graph uid", exc_info=True)
+        return None
