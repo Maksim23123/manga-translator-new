@@ -35,6 +35,10 @@ from app.third_party.PyFlow.PyFlow.Packages.MangaTranslator.Tools.PipelineProper
 from app.third_party.PyFlow.PyFlow.Packages.MangaTranslator.Tools.PipelinesListDockTool import (
     PipelinesListDockTool,
 )
+from app.frameworks.pyside6_gui.tabs.pipelines.output_node_guard import (
+    PipelineOutputGuard,
+    set_global_output_guard,
+)
 from app.frameworks.pyside6_gui.tabs.pipelines.dock_adapters import (
     PipelinePropertiesDockAdapter,
     PipelinesListDockAdapter,
@@ -101,6 +105,9 @@ class PyFlowWrapper(QWidget, QObject):
         self._layout.setContentsMargins(0, 0, 0, 0)
 
         self._pyflow_instance = self._setup_pyflow(pyflow_instance)
+        self._output_guard = PipelineOutputGuard(self._pyflow_instance.graphManager)
+        set_global_output_guard(self._output_guard)
+        self._attach_output_guard_hooks()
         self._layout.addWidget(self._pyflow_instance)
         self._cache_shelf_tools(self._pyflow_instance)
         self._cache_dock_tools(self._pyflow_instance)
@@ -131,6 +138,28 @@ class PyFlowWrapper(QWidget, QObject):
                     pass
 
         return pyflow
+
+    def _attach_output_guard_hooks(self) -> None:
+        """Keep the single-output-node guard synced with PyFlow graph changes."""
+        try:
+            self._output_guard.dedupe_existing()
+        except Exception:
+            log.debug("Failed to run initial pipeline output dedupe", exc_info=True)
+
+        graph_manager = getattr(self._pyflow_instance, "graphManager", None)
+        graph_changed = getattr(graph_manager, "graphChanged", None)
+        if graph_changed and hasattr(graph_changed, "connect"):
+            try:
+                graph_changed.connect(self._handle_graph_changed)
+            except Exception:
+                log.debug("Failed to attach pipeline output guard to graphChanged", exc_info=True)
+
+    def _handle_graph_changed(self, *_args) -> None:
+        if getattr(self, "_output_guard", None):
+            try:
+                self._output_guard.dedupe_existing()
+            except Exception:
+                log.debug("Failed to dedupe pipeline output nodes on graph change", exc_info=True)
 
     def _remove_empty_shelf_tools(self, instance: PyFlow) -> None:
         """Drop placeholder ShelfTool entries to match the legacy setup."""
@@ -313,11 +342,23 @@ class PyFlowWrapper(QWidget, QObject):
     # endregion
 
     # region PyFlowGateway implementation
+    def _reset_output_guard(self) -> None:
+        """Clear output guard tracking before graph resets."""
+        if getattr(self, "_output_guard", None):
+            try:
+                self._output_guard.reset()
+            except Exception:
+                log.debug("Failed to reset pipeline output guard", exc_info=True)
+
     def load_graph(self, graph_path: Path) -> None:
+        self._reset_output_guard()
         try:
             self._pyflow_instance.loadFromFile(str(graph_path))
         except Exception as exc:
             log.exception("Failed to load graph '%s': %s", graph_path, exc)
+        else:
+            if getattr(self, "_output_guard", None):
+                self._output_guard.dedupe_existing()
 
     def save_graph(self, target_path: Path) -> None:
         try:
@@ -327,10 +368,14 @@ class PyFlowWrapper(QWidget, QObject):
             log.exception("Failed to save graph to '%s': %s", target_path, exc)
 
     def new_blank(self) -> None:
+        self._reset_output_guard()
         try:
             self._pyflow_instance.newFile()
         except Exception as exc:
             log.exception("Failed to create a blank PyFlow graph: %s", exc)
+        else:
+            if getattr(self, "_output_guard", None):
+                self._output_guard.dedupe_existing()
 
     def on_dirty_changed(self, callback: Callable[[bool], None]) -> None:
         self.modifiedChanged.connect(callback)

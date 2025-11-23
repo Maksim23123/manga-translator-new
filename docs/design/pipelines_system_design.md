@@ -80,6 +80,7 @@ Participants: Assistant (Codex), Makss
 - 2025-11-24 - Deferred pipeline deletion cleanup to load-time orphan sweeping, narrowed `cleanup_after_save` to shared-temp removal, and now delete drafts immediately while keeping finals on pipeline delete.
 - 2025-11-26 - Persisted pipeline metadata into project meta via the `ProjectPipelineMetadataRepository`, wired the graph editor tab into project lifecycle hooks (project-ready load, finalize/promotion before save), and bridged pipeline dirty events to the shared lifecycle bus.
 - 2025-11-27 - Disabled PyFlow canvas interactions when no active pipeline is selected, using `ActivePipelineChanged` wiring to toggle the embedded editor.
+- 2025-11-29 - Added a PyFlow output-node guard to enforce a single pipeline output node per graph, mirroring the legacy interaction manager.
 
 ## 10. Presentation Wiring Conventions
 - Prefer the view-owned wiring already used in doc-units: framework widgets receive controllers and presenters, call controller methods in response to UI events, and attach themselves to presenters (controllers remain view-agnostic).

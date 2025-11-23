@@ -7,6 +7,11 @@ try:
 except ModuleNotFoundError:
     Core = None  # type: ignore[assignment]
 
+try:
+    from app.frameworks.pyside6_gui.tabs.pipelines.output_node_guard import get_global_output_guard
+except Exception:
+    get_global_output_guard = None  # type: ignore[assignment]
+
 
 class PipelineOutputNode(NodeBase):
     def __init__(self, name):
@@ -16,11 +21,10 @@ class PipelineOutputNode(NodeBase):
         
         self.pipeline_result_image_input_pin = self.createInputPin('Image', 'ImageArrayPin')
 
-        self._register_as_output_node()
-
 
     def postCreate(self, jsonTemplate=None):
         super().postCreate(jsonTemplate)
+        self._register_as_output_node()
         if self.remove_post_create:
             self.kill()
     
@@ -50,6 +54,13 @@ class PipelineOutputNode(NodeBase):
     
 
     def _register_as_output_node(self):
+        guard = get_global_output_guard() if callable(get_global_output_guard) else None
+        if guard:
+            allowed = guard.register(self)
+            if not allowed:
+                self.remove_post_create = True
+                return
+
         if not self.core:
             return
         self.core.pipelines_manager.pyflow_interaction_manager.set_output_node(self)
