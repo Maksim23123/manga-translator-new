@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Callable, DefaultDict, List, Optional, Type, TypeVar
 
 from app.domain.pipelines.graph_pointer import GraphPointer
@@ -43,6 +44,15 @@ class PipelineGraphDirtyChanged:
 class PipelineGraphPointerUpdated:
     name: str
     pointer: GraphPointer
+
+
+@dataclass(slots=True)
+class PipelineGraphLoadWarning:
+    """Emitted when a pipeline graph fails to load (missing/corrupt)."""
+
+    name: str
+    path: Path | None
+    reason: str
 
 
 EventT = TypeVar("EventT")

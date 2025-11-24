@@ -9,6 +9,7 @@ from app.application.pipelines.events import (
     PipelineAdded,
     PipelineEventBus,
     PipelineGraphDirtyChanged,
+    PipelineGraphLoadWarning,
     PipelineGraphPointerUpdated,
     PipelineListUpdated,
     PipelineRemoved,
@@ -77,11 +78,7 @@ class PipelineService:
 
         active = self._collection.active
         if active:
-            active_path = active.graph.active_path()
-            if active_path:
-                self._pyflow.load_graph(active_path)
-            else:
-                self._pyflow.new_blank()
+            self._load_graph_or_blank(active)
             self._publish(ActivePipelineChanged(active.name))
         else:
             self._pyflow.new_blank()
@@ -156,8 +153,8 @@ class PipelineService:
         if self._active_store:
             self._active_store.set_active(active.name if active else None)
 
-        if active and active.graph.active_path():
-            self._pyflow.load_graph(active.graph.active_path())  # type: ignore[arg-type]
+        if active:
+            self._load_graph_or_blank(active)
         else:
             self._pyflow.new_blank()
 
@@ -237,3 +234,25 @@ class PipelineService:
             self._storage.cleanup_current_shared_temp()
         except Exception:
             log.debug("Failed to cleanup shared temp after save", exc_info=True)
+
+    def _load_graph_or_blank(self, pipeline: PipelineUnit) -> None:
+        """Load the pipeline graph if available; fall back to blank with a warning."""
+        path = pipeline.graph.active_path()
+        if path is None:
+            self._pyflow.new_blank()
+            return
+
+        if not path.exists():
+            reason = f"Graph file missing at {path}"
+            log.warning("Pipeline '%s' graph missing: %s", pipeline.name, path)
+            self._publish(PipelineGraphLoadWarning(pipeline.name, path, reason))
+            self._pyflow.new_blank()
+            return
+
+        try:
+            self._pyflow.load_graph(path)  # type: ignore[arg-type]
+        except Exception as ex:  # pragma: no cover - depends on PyFlow internals
+            reason = f"Failed to load graph '{path}': {ex}"
+            log.warning("Pipeline '%s' graph load failed: %s", pipeline.name, ex)
+            self._publish(PipelineGraphLoadWarning(pipeline.name, path, reason))
+            self._pyflow.new_blank()

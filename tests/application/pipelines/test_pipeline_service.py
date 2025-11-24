@@ -32,15 +32,27 @@ class StubGraphStorage:
     def delete_graph(self, pointer: GraphPointer) -> None:  # pragma: no cover - not used here
         pass
 
+    def cleanup_project_orphans(self, _expected: set[str]) -> None:  # pragma: no cover - noop for tests
+        pass
+
+    def cleanup_shared_temp(self) -> None:  # pragma: no cover - noop for tests
+        pass
+
+    def cleanup_current_shared_temp(self) -> None:  # pragma: no cover - noop for tests
+        pass
+
 
 class StubPyFlowGateway:
-    def __init__(self) -> None:
+    def __init__(self, *, fail_on_load: bool = False) -> None:
         self.load_graph_calls: list[Path] = []
         self.save_graph_calls: list[Path] = []
         self.new_blank_calls = 0
         self.dirty_callbacks = []
+        self.fail_on_load = fail_on_load
 
     def load_graph(self, graph_path: Path) -> None:
+        if self.fail_on_load:
+            raise RuntimeError("load failed")
         self.load_graph_calls.append(graph_path)
 
     def save_graph(self, target_path: Path) -> None:
@@ -168,3 +180,48 @@ def test_promote_all_updates_pointer_and_keeps_drafts_on_failure() -> None:
 
     assert promoted_fail == []
     assert pipeline2.graph.status is GraphPointerStatus.DRAFT
+
+
+def test_load_missing_graph_warns_and_opens_blank(tmp_path: Path) -> None:
+    event_bus = PipelineEventBus()
+    pyflow_gateway = StubPyFlowGateway()
+    service = _build_service(event_bus, pyflow_gateway)
+
+    pipeline = service.create("Pipeline")
+    missing_path = tmp_path / "missing.pygraph"
+    pipeline.update_graph(GraphPointer(final_path=missing_path, draft_path=None, status=GraphPointerStatus.FINAL))
+    service._metadata_repo.save(service.collection)  # type: ignore[attr-defined]
+
+    warnings = []
+    from app.application.pipelines.events import PipelineGraphLoadWarning
+
+    event_bus.subscribe(PipelineGraphLoadWarning, lambda e: warnings.append(e))
+
+    service.load()
+
+    assert pyflow_gateway.new_blank_calls == 1
+    assert warnings and warnings[0].path == missing_path
+    assert "missing" in warnings[0].reason.lower()
+
+
+def test_load_graph_error_warns_and_opens_blank(tmp_path: Path) -> None:
+    event_bus = PipelineEventBus()
+    pyflow_gateway = StubPyFlowGateway(fail_on_load=True)
+    service = _build_service(event_bus, pyflow_gateway)
+
+    pipeline = service.create("Pipeline")
+    existing_path = tmp_path / "present.pygraph"
+    existing_path.write_text("data")
+    pipeline.update_graph(GraphPointer(final_path=existing_path, draft_path=None, status=GraphPointerStatus.FINAL))
+    service._metadata_repo.save(service.collection)  # type: ignore[attr-defined]
+
+    warnings = []
+    from app.application.pipelines.events import PipelineGraphLoadWarning
+
+    event_bus.subscribe(PipelineGraphLoadWarning, lambda e: warnings.append(e))
+
+    service.load()
+
+    assert pyflow_gateway.new_blank_calls == 1
+    assert warnings and warnings[0].path == existing_path
+    assert "failed to load" in warnings[0].reason.lower()

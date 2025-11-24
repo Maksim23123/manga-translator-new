@@ -114,6 +114,7 @@ def build_graph_editor_tab(
     pyflow_gateway.set_delegate(tab.pyflow_wrapper)
     _bridge_pipeline_dirty(event_bus, lifecycle_event_bus)
     _wire_pipeline_interactivity(event_bus, tab, service)
+    _wire_pipeline_load_warnings(event_bus, tab)
 
     def finalize_pipelines() -> None:
         if project_store:
@@ -215,3 +216,30 @@ def _wire_pipeline_interactivity(
         tab.pyflow_wrapper.set_interactive(service.collection.active is not None)
     except Exception:
         log.debug("Failed to apply initial PyFlow interactivity state", exc_info=True)
+
+
+def _wire_pipeline_load_warnings(
+    pipeline_event_bus: PipelineEventBus,
+    tab: GraphEditorTab,
+) -> None:
+    """Surface graph load failures to the user instead of failing silently."""
+    try:
+        from PySide6.QtWidgets import QMessageBox
+    except Exception:
+        log.debug("PySide6 not available; pipeline load warnings will be logged only")
+        return
+
+    from app.application.pipelines.events import PipelineGraphLoadWarning
+
+    def _show(event: PipelineGraphLoadWarning) -> None:
+        path_hint = str(event.path) if event.path else "unknown location"
+        message = (
+            f"Pipeline '{event.name}' graph could not be loaded from {path_hint}.\n"
+            f"{event.reason}\nA blank graph was opened instead."
+        )
+        try:
+            QMessageBox.warning(tab, "Pipeline graph missing", message)
+        except Exception:
+            log.debug("Failed to show pipeline load warning dialog", exc_info=True)
+
+    pipeline_event_bus.subscribe(PipelineGraphLoadWarning, _show)
