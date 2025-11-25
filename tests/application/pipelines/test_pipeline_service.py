@@ -192,6 +192,9 @@ def test_load_missing_graph_warns_and_opens_blank(tmp_path: Path) -> None:
     pipeline.update_graph(GraphPointer(final_path=missing_path, draft_path=None, status=GraphPointerStatus.FINAL))
     service._metadata_repo.save(service.collection)  # type: ignore[attr-defined]
 
+    # Reset to count only the new_blank triggered during load.
+    pyflow_gateway.new_blank_calls = 0
+
     warnings = []
     from app.application.pipelines.events import PipelineGraphLoadWarning
 
@@ -214,6 +217,9 @@ def test_load_graph_error_warns_and_opens_blank(tmp_path: Path) -> None:
     existing_path.write_text("data")
     pipeline.update_graph(GraphPointer(final_path=existing_path, draft_path=None, status=GraphPointerStatus.FINAL))
     service._metadata_repo.save(service.collection)  # type: ignore[attr-defined]
+
+    # Reset to count only the new_blank triggered during load.
+    pyflow_gateway.new_blank_calls = 0
 
     warnings = []
     from app.application.pipelines.events import PipelineGraphLoadWarning

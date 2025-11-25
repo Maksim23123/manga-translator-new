@@ -70,6 +70,7 @@ class PipelineService:
         if self._active_store:
             self._active_store.clear()
 
+        previous_active = self._collection.active
         self._collection = self._metadata_repo.load()
 
         # Reset to no active pipeline on load; selection is transient.
@@ -81,7 +82,12 @@ class PipelineService:
             self._load_graph_or_blank(active)
             self._publish(ActivePipelineChanged(active.name))
         else:
-            self._pyflow.new_blank()
+            # Attempt to load the previously active pipeline to surface warnings if the graph is missing/corrupt,
+            # but do not keep it active after load.
+            if previous_active:
+                self._load_graph_or_blank(previous_active)
+            else:
+                self._pyflow.new_blank()
             self._publish(ActivePipelineChanged(None))
 
         self._cleanup_orphans()
