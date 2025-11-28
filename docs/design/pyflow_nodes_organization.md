@@ -75,6 +75,7 @@ Participants: Codex (assistant), Makss
 - [x] Add a thin orchestration contract for nodes (construct logic, connect signals, set outputs) and document it.
 - [x] Add unit tests for `PipelineOutputGuard` happy path and duplicate cleanup.
 - [x] Add smoke tests for node `compute` methods with new dependency stubs to confirm error messaging and data propagation.
+- [x] Provide a headless PyFlow runner + CLI that loads `.pygraph`, injects preview image path, evaluates nodes, and returns/saves the resulting image.
 
 ## 9. Changelog
 - 2025-11-27 - Initial snapshot of PyFlow nodes organization and known dependency gaps.

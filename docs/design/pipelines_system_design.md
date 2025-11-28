@@ -23,6 +23,7 @@ Participants: Assistant (Codex), Makss
 ## 3. Architecture & Flow
 - **Domain layer:** introduces `PipelineUnit` (name, graph path, dirty hooks), `PipelineCollection` (formerly `PipelineData`), and supporting services for name generation and graph path resolution.
 - **Application layer:** use cases expose pipeline list retrieval, creation, rename/delete, active selection, preview image updates, graph save/load triggers, and execution entry points. Ports abstract persistence and PyFlow orchestration; `PipelineService` now drives a PyFlow gateway and publishes events through `PipelineEventBus`.
+- **Execution path (headless):** `PyFlowPipelineExecutor` orchestrates prepare/run/cleanup and collects diagnostics; a PyFlow-aware runner (to be implemented) loads `.pygraph` files, injects inputs, and evaluates nodes without the GUI. A CLI helper will wrap this to run a pipeline against an image and emit a resulting image file.
 - **Interface adapters:** in-memory metadata repository (`MemPipelineMetadataRepository`) and filesystem `LocalGraphStorage` sit behind ports; presenters/controllers translate use case responses into Qt view models; `DeferredPyFlowGateway` defers PyFlow calls until the wrapper attaches. A shared lifecycle bus is injected so pipeline dirty events promote to project dirty without depending on doc-unit wiring.
 - **Frameworks layer:** PySide6 widgets compose the pipeline tab, integrate PyFlow widget tree, manage dock tools, and surface signals (modified state, selection). `PyFlowWrapper` exposes the PyFlow gateway API while wiring dock tool adapters. Dock widgets (pipeline list, properties, preview) remain packaged as PyFlow add-ons under the MangaTranslator plugin; adapters live in `frameworks` to bridge them to the presenters/controllers.
 - Flow: Qt action -> controller -> use case -> repository/storage/PyFlow gateway -> event bus -> presenter -> PySide6 view (including PyFlow component and dock adapters). Project save delegates to pipeline save use case, which persists metadata and graph files.
@@ -69,6 +70,7 @@ Participants: Assistant (Codex), Makss
 - [x] Add `ActivePipelineStore` port + memory impl to keep active selection transient (not persisted) in parity with doc-units.
 - [x] Add per-project shared temp subfolders, orphan cleanup (shared + project temp/finals), and guards around promotion failure.
 - [x] Block/disable PyFlow editing when no active pipeline is selected to mirror legacy safety.
+- [x] Add PyFlow headless runner + CLI to execute `.pygraph` against an image and emit resulting output.
 
 ## 9. Changelog
 - 2025-10-29 - Drafted pipelines system architecture covering domain/application structure, PyFlow integration strategy, persistence model, and testing plan.
