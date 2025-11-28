@@ -32,6 +32,21 @@ Participants: Codex (assistant), Makss
   - `PipelineOutputNode`: single `ImageArrayPin` input; registers itself through the output guard and returns the image in `compute`.
 - Typical data flow (when all deps exist): Input -> Detect -> Inpaint -> Extract -> Translate -> Insert -> Output.
 
+### 3.1 Logic interfaces (new)
+- `ImageImportLogic.run(path: str) -> ImageType`: validate/resolve preview path and return an image payload (cv2 matrix when available, numpy buffer, or a byte-list fallback). Raises `NodeLogicError` when the path is missing or unreadable.
+- `TextDetectionLogic.run(image) -> Hierarchy`: accepts image payload, produces a `Hierarchy` container (empty placeholder until a detector backend is wired).
+- `InpainterLogic.run(image, hierarchy) -> image`: validates both inputs, returns a copy of the image (placeholder until backend exists).
+- `TextExtractionLogic.run(image, hierarchy) -> Tuple[List[Seq[int]], List[str]]`: emits text areas and original text lists, deriving content from hierarchy chunks; lengths always align.
+- `TranslationLogic.run(texts: Iterable[str]) -> List[str]`: deterministic translation stub prepending `[translated]` to preserve 1:1 ordering.
+- `TextInsertionLogic.run(image, areas, texts) -> image`: validates input alignment, returns a copy of the image (placeholder until backend exists).
+- `Hierarchy` now lives in `logic/hierarchy.py`, exposed via pins to decouple from legacy `pipeline.text_detector.*` imports.
+
+### 3.2 Node orchestration contract
+- Nodes should construct their logic collaborator eagerly (no side-effects), call `logic.run(...)` inside `compute`, and catch `NodeLogicError` to surface a user-friendly node error without crashing the GUI.
+- Inputs must be validated before calling logic; array inputs get copied (via `copy_image`) to avoid mutating upstream pins.
+- Legacy imports remain optional/guarded; the new logic path is the primary execution path.
+- Nodes should keep event subscriptions optional (e.g., input node listening to preview changes) and callable guards safe for headless tests.
+
 ## 4. Data & Storage
 - Pins:
   - `ImageArrayPin` defaults to an empty numpy array (or list fallback), serializes by clearing data to avoid bloating saved graphs.
@@ -56,10 +71,10 @@ Participants: Codex (assistant), Makss
 - Integration tests would need stubs/mocks for missing `pipeline.*` modules to validate node `compute` error handling.
 
 ## 8. Implementation Checklist
-- [ ] Define replacement interfaces for import/detect/inpaint/extract/translate/insert/output that will supersede the legacy `pipeline.*`/`core.*` modules, implemented as logic classes colocated with nodes.
-- [ ] Add a thin orchestration contract for nodes (construct logic, connect signals, set outputs) and document it.
-- [ ] Add unit tests for `PipelineOutputGuard` happy path and duplicate cleanup.
-- [ ] Add smoke tests for node `compute` methods with new dependency stubs to confirm error messaging and data propagation.
+- [x] Define replacement interfaces for import/detect/inpaint/extract/translate/insert/output that will supersede the legacy `pipeline.*`/`core.*` modules, implemented as logic classes colocated with nodes.
+- [x] Add a thin orchestration contract for nodes (construct logic, connect signals, set outputs) and document it.
+- [x] Add unit tests for `PipelineOutputGuard` happy path and duplicate cleanup.
+- [x] Add smoke tests for node `compute` methods with new dependency stubs to confirm error messaging and data propagation.
 
 ## 9. Changelog
 - 2025-11-27 - Initial snapshot of PyFlow nodes organization and known dependency gaps.

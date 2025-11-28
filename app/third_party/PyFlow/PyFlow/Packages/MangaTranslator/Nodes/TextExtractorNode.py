@@ -2,16 +2,7 @@ from PyFlow.Core import NodeBase
 from PyFlow.Core.NodeBase import NodePinsSuggestionsHelper
 from PyFlow.Core.Common import *
 
-try:
-    from pipeline.text_extractor import TextExtractor
-except ModuleNotFoundError:
-    TextExtractor = None  # type: ignore[assignment]
-
-try:
-    from pipeline.text_detector.hierarchy_builder.hierarchy import Hierarchy
-except ModuleNotFoundError:
-    class Hierarchy:  # type: ignore[override]
-        text_chunks = []
+from PyFlow.Packages.MangaTranslator.logic import Hierarchy, NodeLogicError, TextExtractionLogic, copy_image
 
 
 
@@ -19,7 +10,7 @@ class TextExtractorNode(NodeBase):
     def __init__(self, name):
         super(TextExtractorNode, self).__init__(name)
 
-        self.text_extractor = TextExtractor() if TextExtractor else None
+        self.text_extractor = TextExtractionLogic()
 
         self.image_inp_pin = self.createInputPin('Image', 'ImageArrayPin')
         self.hierarchy_inp_pin = self.createInputPin('Hierarchy', 'HierarchyPin')
@@ -54,16 +45,18 @@ class TextExtractorNode(NodeBase):
     def compute(self, *args, **kwargs):
         image = self.image_inp_pin.getData()
         hierarchy = self.hierarchy_inp_pin.getData()
-        if self.text_extractor is None:
-            self.setError("Text extractor dependency unavailable.")
+        if image is None:
+            self.setError("Invalid image input.")
             return
-        if (not image is None and not hierarchy is None
-                and isinstance(hierarchy, Hierarchy)):
-            text_areas, original_text = self.text_extractor.extract_text(image.copy()
-                                                            , hierarchy.text_chunks)
+        if hierarchy is None or not isinstance(hierarchy, Hierarchy):
+            self.setError("Invalid hierarchy input.")
+            return
+        try:
+            text_areas, original_text = self.text_extractor.run(copy_image(image), hierarchy)
+        except NodeLogicError as exc:
+            self.setError(str(exc))
+            return
 
-            self.text_areas_out_pin.setData(text_areas)
-            self.text_out_pin.setData(original_text)
-        else:
-            self.setError(ValueError("Wrong node inputs."))
+        self.text_areas_out_pin.setData(text_areas)
+        self.text_out_pin.setData(original_text)
 

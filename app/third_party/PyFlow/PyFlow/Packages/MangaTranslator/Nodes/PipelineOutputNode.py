@@ -58,6 +58,7 @@ class PipelineOutputNode(NodeBase):
         if guard:
             allowed = guard.register(self)
             if not allowed:
+                self.setError("Only one PipelineOutputNode is allowed per graph.")
                 self.remove_post_create = True
                 return
 

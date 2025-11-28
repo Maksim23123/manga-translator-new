@@ -2,16 +2,7 @@ from PyFlow.Core import NodeBase
 from PyFlow.Core.NodeBase import NodePinsSuggestionsHelper
 from PyFlow.Core.Common import *
 
-try:
-    from pipeline.inpainter import Inpainter
-except ModuleNotFoundError:
-    Inpainter = None  # type: ignore[assignment]
-
-try:
-    from pipeline.text_detector.hierarchy_builder.hierarchy import Hierarchy
-except ModuleNotFoundError:
-    class Hierarchy:  # type: ignore[override]
-        chunks_deepest_boxes = []
+from PyFlow.Packages.MangaTranslator.logic import Hierarchy, InpainterLogic, NodeLogicError, copy_image
 
 
 
@@ -19,7 +10,7 @@ class InpainterNode(NodeBase):
     def __init__(self, name):
         super(InpainterNode, self).__init__(name)
 
-        self.inpainter = Inpainter() if Inpainter else None
+        self.inpainter = InpainterLogic()
 
         self.image_inp_pin = self.createInputPin('Image', 'ImageArrayPin')
         self.hierarchy_inp_pin = self.createInputPin('Hierarchy', 'HierarchyPin')
@@ -52,14 +43,17 @@ class InpainterNode(NodeBase):
         hierarchy = self.hierarchy_inp_pin.getData()
         input_image = self.image_inp_pin.getData()
 
-        if self.inpainter is None:
-            self.setError("Inpainter dependency unavailable.")
+        if input_image is None:
+            self.setError("Invalid image input.")
+            return
+        if hierarchy is None or not isinstance(hierarchy, Hierarchy):
+            self.setError("Invalid hierarchy input.")
             return
 
-        if (not input_image is None and not hierarchy is None
-                and isinstance(hierarchy, Hierarchy)):
-            inpainted_image = self.inpainter.inpaint_bboxes(input_image.copy(), hierarchy.chunks_deepest_boxes)
+        try:
+            inpainted_image = self.inpainter.run(copy_image(input_image), hierarchy)
+        except NodeLogicError as exc:
+            self.setError(str(exc))
+            return
 
-            self.inpainted_image_out_pin.setData(inpainted_image)
-        else:
-            self.setError(ValueError("Wrong node inputs."))
+        self.inpainted_image_out_pin.setData(inpainted_image)

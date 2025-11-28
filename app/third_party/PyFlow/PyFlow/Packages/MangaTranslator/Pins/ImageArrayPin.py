@@ -14,13 +14,18 @@ except ModuleNotFoundError:
     _MAT_TYPE = list
 
 
-
 class ImageArrayPin(PinBase):
-    """doc string for DemoPin"""
+    """Holds an image payload (numpy/cv2 matrix or list fallback)."""
+
     def __init__(self, name, parent, direction, **kwargs):
         super(ImageArrayPin, self).__init__(name, parent, direction, **kwargs)
-        default_value = np.zeros if np else lambda *args, **kwargs: []
-        self.setDefaultValue(default_value)
+        self.setDefaultValue(self._empty_image())
+
+    @staticmethod
+    def _empty_image():
+        if np is not None:
+            return np.zeros((0, 0, 3), dtype=np.uint8)
+        return []
 
     @staticmethod
     def IsValuePin():
@@ -47,5 +52,10 @@ class ImageArrayPin(PinBase):
         return data
     
     def serialize(self):
+        original_default = self._defaultValue
         self.setData(None)
-        return super().serialize()
+        self._defaultValue = None
+        try:
+            return super().serialize()
+        finally:
+            self._defaultValue = original_default

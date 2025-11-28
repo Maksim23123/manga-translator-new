@@ -1,11 +1,6 @@
 import os
 
 try:
-    from pipeline.image_importer import ImageImporter
-except ModuleNotFoundError:
-    ImageImporter = None  # type: ignore[assignment]
-
-try:
     from core.core import Core
 except ModuleNotFoundError:
     Core = None  # type: ignore[assignment]
@@ -13,6 +8,8 @@ except ModuleNotFoundError:
 from PyFlow.Core import NodeBase
 from PyFlow.Core.NodeBase import NodePinsSuggestionsHelper
 from PyFlow.Core.Common import *
+
+from PyFlow.Packages.MangaTranslator.logic import ImageImportLogic, NodeLogicError
 
 
 
@@ -29,7 +26,7 @@ class PipelineInputImageNode(NodeBase):
             self.pyflow_interaction_manager.preview_image_path if self.pyflow_interaction_manager else None
         )
 
-        self.image_importer = ImageImporter() if ImageImporter else None
+        self.image_importer = ImageImportLogic()
 
         self.image_out_pin = self.createOutputPin('Image', 'ImageArrayPin')
 
@@ -81,12 +78,11 @@ class PipelineInputImageNode(NodeBase):
     def import_image(self):
         if not self.check_path(self._image_path):
             return
-        if self.image_importer is None:
-            self.setError("Image importer dependency unavailable.")
+        try:
+            image = self.image_importer.run(self._image_path)
+        except NodeLogicError as exc:
+            self.setError(str(exc))
             return
-        if not self.image_importer.import_image(self._image_path):
-            return
-        image = self.image_importer.imported_image
         self.image_out_pin.setData(image)
 
 

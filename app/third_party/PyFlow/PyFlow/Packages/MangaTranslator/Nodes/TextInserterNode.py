@@ -2,10 +2,7 @@ from PyFlow.Core import NodeBase
 from PyFlow.Core.NodeBase import NodePinsSuggestionsHelper
 from PyFlow.Core.Common import *
 
-try:
-    from pipeline.text_inserter import TextInserter
-except ModuleNotFoundError:
-    TextInserter = None  # type: ignore[assignment]
+from PyFlow.Packages.MangaTranslator.logic import NodeLogicError, TextInsertionLogic, copy_image
 
 
 
@@ -13,7 +10,7 @@ class TextInserterNode(NodeBase):
     def __init__(self, name):
         super(TextInserterNode, self).__init__(name)
 
-        self.text_inserter = TextInserter() if TextInserter else None
+        self.text_inserter = TextInsertionLogic()
 
         self.image_inp_pin = self.createInputPin('Image', 'ImageArrayPin')
         self.text_areas_inp_pin = self.createInputPin('Text areas', 'IntPin', structure=StructureType.Array)
@@ -26,7 +23,7 @@ class TextInserterNode(NodeBase):
         helper.addInputDataType('ImageArrayPin')
         helper.addInputDataType('IntPin')
         helper.addInputDataType('StringPin')
-        helper.addOutputDataType('Image')
+        helper.addOutputDataType('ImageArrayPin')
         helper.addInputStruct(StructureType.Single)
         helper.addInputStruct(StructureType.Array)
         helper.addInputStruct(StructureType.Array)
@@ -47,17 +44,20 @@ class TextInserterNode(NodeBase):
 
     def compute(self, *args, **kwargs):
         image = self.image_inp_pin.getData()
-        text_ares = self.text_areas_inp_pin.getData()
+        text_areas = self.text_areas_inp_pin.getData()
         text = self.text_inp_pin.getData()
 
-        if self.text_inserter is None:
-            self.setError("Text inserter dependency unavailable.")
+        if image is None:
+            self.setError("Invalid image input.")
+            return
+        if text_areas is None or text is None:
+            self.setError("Invalid text inputs.")
             return
 
-        if image is None or text_ares is None or text is None:
-            self.setError("Invalid input.")
+        try:
+            image_with_text = self.text_inserter.run(copy_image(image), text_areas, text)
+        except NodeLogicError as exc:
+            self.setError(str(exc))
             return
-
-        image_with_text = self.text_inserter.insert_text_into_image(image.copy(), text_ares, text)
 
         self.image_with_text_out_pin.setData(image_with_text)

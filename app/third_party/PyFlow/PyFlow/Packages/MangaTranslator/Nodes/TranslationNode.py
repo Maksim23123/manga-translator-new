@@ -2,17 +2,14 @@ from PyFlow.Core import NodeBase
 from PyFlow.Core.NodeBase import NodePinsSuggestionsHelper
 from PyFlow.Core.Common import *
 
-try:
-    from pipeline.translator import Translator
-except ModuleNotFoundError:
-    Translator = None  # type: ignore[assignment]
+from PyFlow.Packages.MangaTranslator.logic import NodeLogicError, TranslationLogic
 
 
 class TranslationNode(NodeBase):
     def __init__(self, name):
         super(TranslationNode, self).__init__(name)
 
-        self.translator = Translator() if Translator else None
+        self.translator = TranslationLogic()
 
         self.text_inp_pin = self.createInputPin('Text', 'StringPin', structure=StructureType.Array)
         self.translated_text_out_pin = self.createOutputPin('Translation', 'StringPin', structure=StructureType.Array)
@@ -44,11 +41,12 @@ class TranslationNode(NodeBase):
         if text_list is None:
             self.setError("Text input missing")
             return
-        if self.translator is None:
-            self.setError("Translator dependency unavailable.")
-            return
         
-        translation = self.translator.translate_text_list(text_list)
+        try:
+            translation = self.translator.run(text_list)
+        except NodeLogicError as exc:
+            self.setError(str(exc))
+            return
 
         self.translated_text_out_pin.setData(translation)
 
