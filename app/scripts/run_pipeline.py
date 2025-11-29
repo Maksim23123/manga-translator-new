@@ -66,6 +66,34 @@ def save_image(image, output_path: Path) -> Optional[Path]:
     if image is None:
         print("No image returned from pipeline.")
         return None
+
+    # If the pipeline returned raw bytes (or a list of byte values), persist them directly.
+    if isinstance(image, (bytes, bytearray, memoryview)):
+        try:
+            output_path.write_bytes(bytes(image))
+            return output_path
+        except Exception:
+            pass
+
+    if isinstance(image, (list, tuple)):
+        try:
+            # Attempt to interpret a flat list/tuple of ints as raw bytes.
+            if all(isinstance(v, int) and 0 <= v <= 255 for v in image):
+                output_path.write_bytes(bytes(image))
+                return output_path
+        except Exception:
+            pass
+
+    # If a path/string was returned, copy the file into place.
+    if isinstance(image, (str, Path)):
+        candidate = Path(image)
+        if candidate.exists():
+            try:
+                output_path.write_bytes(candidate.read_bytes())
+                return output_path
+            except Exception:
+                pass
+
     if cv2 is not None:
         try:
             if cv2.imwrite(str(output_path), image):
