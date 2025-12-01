@@ -4,8 +4,8 @@ from PyFlow.Core.Common import *
 
 from PyFlow.Packages.MangaTranslator.logic import (
     Hierarchy,
-    LegacyTextDetectionBackend,
     NodeLogicError,
+    TextDetectionBackend,
     copy_image,
 )
 
@@ -15,7 +15,7 @@ class TextDetectorNode(NodeBase):
     def __init__(self, name):
         super(TextDetectorNode, self).__init__(name)
 
-        self.text_detector = LegacyTextDetectionBackend()
+        self.text_detector = TextDetectionBackend()
 
         self.image_inp_pin = self.createInputPin('Image', 'ImageArrayPin')
         self.hierarchy_out_pin = self.createOutputPin('Hierarchy', 'HierarchyPin')

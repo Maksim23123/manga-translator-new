@@ -1,33 +1,21 @@
 from .base import ImageType, NodeLogicError, copy_image
 from .hierarchy import Hierarchy
 from .image_import import ImageImportLogic
-from .inpainting import InpainterLogic
-from .legacy_backends import (
-    LegacyInpainterBackend,
-    LegacyTextDetectionBackend,
-    LegacyTextExtractionBackend,
-    LegacyTextInsertionBackend,
-    LegacyTranslationBackend,
-)
-from .text_detection import TextDetectionLogic
-from .text_extraction import TextExtractionLogic
-from .text_insertion import TextInsertionLogic
-from .translation import TranslationLogic
+from .inpainting_backend import InpainterBackend
+from .text_detection_backend import TextDetectionBackend
+from .text_extraction_backend import TextExtractionBackend
+from .text_insertion_backend import TextInsertionBackend
+from .translation_backend import TranslationBackend
 
 __all__ = [
     "Hierarchy",
     "ImageImportLogic",
-    "InpainterLogic",
-    "LegacyInpainterBackend",
-    "LegacyTextDetectionBackend",
-    "LegacyTextExtractionBackend",
-    "LegacyTextInsertionBackend",
-    "LegacyTranslationBackend",
+    "InpainterBackend",
     "NodeLogicError",
-    "TextDetectionLogic",
-    "TextExtractionLogic",
-    "TextInsertionLogic",
-    "TranslationLogic",
+    "TextDetectionBackend",
+    "TextExtractionBackend",
+    "TextInsertionBackend",
+    "TranslationBackend",
     "copy_image",
     "ImageType",
 ]

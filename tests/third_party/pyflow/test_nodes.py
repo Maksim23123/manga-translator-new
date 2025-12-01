@@ -31,6 +31,7 @@ def test_text_detector_produces_hierarchy():
     from PyFlow.Packages.MangaTranslator.Nodes.TextDetectorNode import TextDetectorNode
 
     node = TextDetectorNode("detector")
+    node.text_detector = type("StubDetector", (), {"detect": lambda self, image: Hierarchy()})()
     node.image_inp_pin.setData([1, 2, 3])
 
     node.compute()
@@ -43,6 +44,7 @@ def test_translation_node_translates_text():
     from PyFlow.Packages.MangaTranslator.Nodes.TranslationNode import TranslationNode
 
     node = TranslationNode("translator")
+    node.translator = type("StubTranslator", (), {"translate": lambda self, texts: [f"stub {t}" for t in texts]})()
     node.text_inp_pin.setData(["hello"])
 
     node.compute()
@@ -71,6 +73,7 @@ def test_text_inserter_happy_path():
     from PyFlow.Packages.MangaTranslator.Nodes.TextInserterNode import TextInserterNode
 
     node = TextInserterNode("inserter")
+    node.text_inserter = type("StubInserter", (), {"insert": lambda self, image, areas, texts: image})()
     node.image_inp_pin.setData([1, 2, 3])
     node.text_areas_inp_pin.setData([(0, 0, 1, 1)])
     node.text_inp_pin.setData(["a"])

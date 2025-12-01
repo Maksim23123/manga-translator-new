@@ -3,8 +3,8 @@ from PyFlow.Core.NodeBase import NodePinsSuggestionsHelper
 from PyFlow.Core.Common import *
 
 from PyFlow.Packages.MangaTranslator.logic import (
-    LegacyTextInsertionBackend,
     NodeLogicError,
+    TextInsertionBackend,
     copy_image,
 )
 
@@ -14,7 +14,7 @@ class TextInserterNode(NodeBase):
     def __init__(self, name):
         super(TextInserterNode, self).__init__(name)
 
-        self.text_inserter = LegacyTextInsertionBackend()
+        self.text_inserter = TextInsertionBackend()
 
         self.image_inp_pin = self.createInputPin('Image', 'ImageArrayPin')
         self.text_areas_inp_pin = self.createInputPin('Text areas', 'IntPin', structure=StructureType.Array)

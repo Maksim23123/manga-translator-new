@@ -4,8 +4,8 @@ from PyFlow.Core.Common import *
 
 from PyFlow.Packages.MangaTranslator.logic import (
     Hierarchy,
-    LegacyTextExtractionBackend,
     NodeLogicError,
+    TextExtractionBackend,
     copy_image,
 )
 
@@ -15,7 +15,7 @@ class TextExtractorNode(NodeBase):
     def __init__(self, name):
         super(TextExtractorNode, self).__init__(name)
 
-        self.text_extractor = LegacyTextExtractionBackend()
+        self.text_extractor = TextExtractionBackend()
 
         self.image_inp_pin = self.createInputPin('Image', 'ImageArrayPin')
         self.hierarchy_inp_pin = self.createInputPin('Hierarchy', 'HierarchyPin')

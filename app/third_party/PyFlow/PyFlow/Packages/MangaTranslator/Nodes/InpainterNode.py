@@ -4,8 +4,8 @@ from PyFlow.Core.Common import *
 
 from PyFlow.Packages.MangaTranslator.logic import (
     Hierarchy,
-    LegacyInpainterBackend,
     NodeLogicError,
+    InpainterBackend,
     copy_image,
 )
 
@@ -15,7 +15,7 @@ class InpainterNode(NodeBase):
     def __init__(self, name):
         super(InpainterNode, self).__init__(name)
 
-        self.inpainter = LegacyInpainterBackend()
+        self.inpainter = InpainterBackend()
 
         self.image_inp_pin = self.createInputPin('Image', 'ImageArrayPin')
         self.hierarchy_inp_pin = self.createInputPin('Hierarchy', 'HierarchyPin')
