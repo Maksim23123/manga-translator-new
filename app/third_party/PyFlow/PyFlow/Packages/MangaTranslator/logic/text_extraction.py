@@ -1,13 +1,19 @@
 from __future__ import annotations
 
-from typing import Any, List, Sequence, Tuple
+from typing import Any, List, Optional, Sequence, Tuple
+
+from PyFlow.Packages.MangaTranslator.protocols import TextExtractionBackend
 
 from .base import NodeLogicError
 from .hierarchy import Hierarchy
+from .legacy_backends import LegacyTextExtractionBackend
 
 
 class TextExtractionLogic:
     """Extracts text strings from detected regions."""
+
+    def __init__(self, backend: Optional[TextExtractionBackend] = None) -> None:
+        self._backend = backend or LegacyTextExtractionBackend()
 
     def run(self, image: Any, hierarchy: Hierarchy) -> Tuple[List[Sequence[int]], List[str]]:
         if image is None:
@@ -15,27 +21,7 @@ class TextExtractionLogic:
         if hierarchy is None:
             raise NodeLogicError("Hierarchy input missing.")
 
-        text_areas: List[Sequence[int]] = []
-        texts: List[str] = []
-
-        for idx, chunk in enumerate(hierarchy.text_chunks or []):
-            bbox = self._extract_bbox(chunk, idx)
-            text = self._extract_text(chunk)
-            text_areas.append(bbox)
-            texts.append(text)
-
+        text_areas, texts = self._backend.extract(image, hierarchy)
+        if len(text_areas) != len(texts):
+            raise NodeLogicError("Text areas/text length mismatch.")
         return text_areas, texts
-
-    @staticmethod
-    def _extract_bbox(chunk: Any, idx: int) -> Sequence[int]:
-        bbox = getattr(chunk, "bbox", None) or getattr(chunk, "box", None)
-        if bbox:
-            return bbox
-        return (idx, idx, idx, idx)
-
-    @staticmethod
-    def _extract_text(chunk: Any) -> str:
-        text = getattr(chunk, "text", None)
-        if text is None:
-            text = getattr(chunk, "content", "") or ""
-        return str(text)
