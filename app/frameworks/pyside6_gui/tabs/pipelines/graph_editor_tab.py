@@ -35,6 +35,8 @@ class GraphEditorTab(Tab):
         pipeline_properties_presenter: Optional[PipelinePropertiesPresenter] = None,
         parent: Optional[QWidget] = None,
         project_ready_callback: Optional[Callable[[], None]] = None,
+        preview_run_handler: Optional[Callable[[], None]] = None,
+        preview_change_handler: Optional[Callable[[], None]] = None,
     ) -> None:
         super().__init__(parent)
         self.set_tab_name(self._default_tab_name)
@@ -52,6 +54,8 @@ class GraphEditorTab(Tab):
             pipeline_list_presenter=pipeline_list_presenter,
             pipeline_properties_controller=pipeline_properties_controller,
             pipeline_properties_presenter=pipeline_properties_presenter,
+            preview_run_handler=preview_run_handler,
+            preview_change_handler=preview_change_handler,
             parent=self
         )
         self.setCentralWidget(self._pyflow_wrapper)

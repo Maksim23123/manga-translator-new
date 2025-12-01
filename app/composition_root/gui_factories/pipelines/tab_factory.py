@@ -5,8 +5,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
 
+from app.application.doc_units.ports import ActiveDocUnitStore
 from app.application.pipelines.events import ActivePipelineChanged, PipelineEventBus
 from app.application.pipelines.pipeline_service import PipelineService
+from app.application.pipelines.pyflow_graph_runner import PyFlowGraphRunner
+from app.application.pipelines.pipeline_executor import PyFlowPipelineExecutor
+from app.application.pipelines.use_cases import RunPipelinePreview, SelectPreviewImage
 from app.application.project.lifecycle_events import (
     ProjectDirtyStateChanged,
     ProjectLifecycleEventBus,
@@ -31,7 +35,9 @@ from app.interface_adapters.pipelines.repositories.mem_pipeline_metadata_reposit
     MemPipelineMetadataRepository,
 )
 from app.interface_adapters.pipelines.stores.mem_active_pipeline_store import MemActivePipelineStore
+from app.interface_adapters.pipelines.stores.mem_pipeline_preview_store import MemPipelinePreviewStore
 from app.interface_adapters.pipelines.storage.local_graph_storage import LocalGraphStorage
+from app.frameworks.pyside6_gui.tabs.pipelines.preview_actions import PreviewActions
 
 log = logging.getLogger(__name__)
 
@@ -58,6 +64,7 @@ def build_graph_editor_tab(
     pipeline_properties_presenter: PipelinePropertiesPresenter | None = None,
     project_store: Optional[CurrentProjectStore] = None,
     lifecycle_event_bus: ProjectLifecycleEventBus | None = None,
+    active_doc_unit_store: ActiveDocUnitStore | None = None,
 ) -> GraphEditorTabBundle:
     """Constructs the PyFlow-backed graph editor tab."""
     event_bus = PipelineEventBus()
@@ -66,15 +73,32 @@ def build_graph_editor_tab(
     graph_storage = LocalGraphStorage(finals_dir=Path("data") / "pipelines", drafts_dir=shared_temp_root)
     pyflow_gateway = DeferredPyFlowGateway()
     active_store = MemActivePipelineStore()
+    preview_store = MemPipelinePreviewStore()
 
     service = PipelineService(
         metadata_repo=metadata_repo,
         storage=graph_storage,
         pyflow_gateway=pyflow_gateway,
         preview_port=None,
+        preview_store=preview_store,
         event_bus=event_bus,
         active_store=active_store,
     )
+
+    select_preview_use_case = SelectPreviewImage(service)
+    executor_factory = lambda graph_path: PyFlowPipelineExecutor(PyFlowGraphRunner(), graph_path=graph_path)
+    run_preview_use_case = RunPipelinePreview(service, executor_factory)
+
+    preview_actions: PreviewActions | None = None
+    if project_store and active_doc_unit_store:
+        preview_actions = PreviewActions(
+            parent=None,
+            pipeline_service=service,
+            project_store=project_store,
+            active_doc_unit_store=active_doc_unit_store,
+            select_preview=select_preview_use_case,
+            run_preview=run_preview_use_case,
+        )
 
     # Core PyFlow presenters/controllers
     presenter = PyFlowPresenter()
@@ -110,7 +134,11 @@ def build_graph_editor_tab(
             project_store=project_store,
             service=service,
         ),
+        preview_run_handler=preview_actions.run_preview if preview_actions else None,
+        preview_change_handler=preview_actions.choose_image if preview_actions else None,
     )
+    if preview_actions:
+        preview_actions.set_parent(tab)
     pyflow_gateway.set_delegate(tab.pyflow_wrapper)
     _bridge_pipeline_dirty(event_bus, lifecycle_event_bus)
     _wire_pipeline_interactivity(event_bus, tab, service)

@@ -41,6 +41,14 @@ class PipelinePreviewPort(Protocol):
     def delete_preview(self, pipeline: PipelineUnit) -> None: ...
 
 
+class PipelinePreviewStore(Protocol):
+    """Tracks transient preview image paths per pipeline (non-persistent)."""
+
+    def get_preview(self, name: str) -> Optional[Path]: ...
+    def set_preview(self, name: str, path: Optional[Path]) -> None: ...
+    def clear(self, name: Optional[str] = None) -> None: ...
+
+
 class ActivePipelineStore(Protocol):
     """Tracks the currently active pipeline without persisting it."""
 

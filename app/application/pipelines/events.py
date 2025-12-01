@@ -35,6 +35,14 @@ class ActivePipelineChanged:
 
 
 @dataclass(slots=True)
+class PreviewImageChanged:
+    """Emitted when the active pipeline's preview image path changes."""
+
+    name: Optional[str]
+    path: Optional[Path]
+
+
+@dataclass(slots=True)
 class PipelineGraphDirtyChanged:
     name: str
     is_dirty: bool

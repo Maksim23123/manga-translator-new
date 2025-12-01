@@ -45,6 +45,7 @@ def build_main_window() -> MainWindow:
     graph_editor_bundle: GraphEditorTabBundle = build_graph_editor_tab(
         project_store=mem_current_project_store,
         lifecycle_event_bus=lifecycle_event_bus,
+        active_doc_unit_store=doc_unit_bundle.active_store,
     )
     graph_editor_tab = graph_editor_bundle.tab
 

@@ -59,6 +59,7 @@ class DocUnitTabBundle:
     tab: DocUnitTab
     finalize_assets: FinalizeDocUnitAssets
     event_bus: DocUnitEventBus
+    active_store: ActiveDocUnitStore
 
 
 def build_doc_unit_tab(
@@ -172,6 +173,7 @@ def build_doc_unit_tab(
         tab=tab,
         finalize_assets=finalize_assets_use_case,
         event_bus=event_bus,
+        active_store=active_doc_unit_store,
     )
 
 

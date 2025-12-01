@@ -12,6 +12,7 @@ from app.application.pipelines.events import (
     PipelineGraphLoadWarning,
     PipelineGraphPointerUpdated,
     PipelineListUpdated,
+    PreviewImageChanged,
     PipelineRemoved,
     PipelineRenamed,
 )
@@ -20,6 +21,7 @@ from app.application.pipelines.ports import (
     GraphStoragePort,
     PipelineMetadataRepository,
     PipelinePreviewPort,
+    PipelinePreviewStore,
     PyFlowGateway,
 )
 from app.domain.pipelines.graph_pointer import GraphPointer, GraphPointerStatus
@@ -39,6 +41,7 @@ class PipelineService:
         storage: GraphStoragePort,
         pyflow_gateway: PyFlowGateway,
         preview_port: Optional[PipelinePreviewPort] = None,
+        preview_store: Optional[PipelinePreviewStore] = None,
         event_bus: Optional[PipelineEventBus] = None,
         active_store: Optional[ActivePipelineStore] = None,
     ) -> None:
@@ -46,6 +49,7 @@ class PipelineService:
         self._storage = storage
         self._pyflow = pyflow_gateway
         self._preview_port = preview_port
+        self._preview_store = preview_store
         self._events = event_bus or PipelineEventBus()
         self._collection = PipelineCollection()
         self._active_store = active_store
@@ -69,6 +73,8 @@ class PipelineService:
     def load(self) -> PipelineCollection:
         if self._active_store:
             self._active_store.clear()
+        if self._preview_store:
+            self._preview_store.clear()
 
         previous_active = self._collection.active
         self._collection = self._metadata_repo.load()
@@ -81,6 +87,7 @@ class PipelineService:
         if active:
             self._load_graph_or_blank(active)
             self._publish(ActivePipelineChanged(active.name))
+            self._hydrate_preview(active)
         else:
             # Attempt to load the previously active pipeline to surface warnings if the graph is missing/corrupt,
             # but do not keep it active after load.
@@ -89,6 +96,7 @@ class PipelineService:
             else:
                 self._pyflow.new_blank()
             self._publish(ActivePipelineChanged(None))
+            self._emit_preview_changed(None)
 
         self._cleanup_orphans()
         return self._collection
@@ -110,6 +118,10 @@ class PipelineService:
                 self._pyflow.new_blank()
             if self._active_store:
                 self._active_store.set_active(active.name if active else None)
+            if active:
+                self._hydrate_preview(active)
+            else:
+                self._emit_preview_changed(None)
 
         return pipeline
 
@@ -118,6 +130,17 @@ class PipelineService:
         self._metadata_repo.save(self._collection)
         self._publish(PipelineRenamed(old_name=old_name, new_name=new_name))
         self._publish(PipelineListUpdated([p.name for p in self._collection.list()]))
+        if self._preview_store:
+            carried_preview = self._preview_store.get_preview(old_name)
+            self._preview_store.clear(old_name)
+            if carried_preview is None:
+                carried_preview = pipeline.preview_path
+            if carried_preview is not None:
+                self._preview_store.set_preview(pipeline.name, carried_preview)
+        if pipeline.preview_path:
+            pipeline.set_preview(pipeline.preview_path)
+        if self._collection.active is pipeline:
+            self._emit_preview_changed(pipeline)
         if self._active_store and self._active_store.get_active() == old_name:
             self._active_store.set_active(pipeline.name)
         return pipeline
@@ -136,6 +159,8 @@ class PipelineService:
                 log.debug("Failed to delete draft graph %s", removed.graph.draft_path, exc_info=True)
         if self._preview_port:
             self._preview_port.delete_preview(removed)
+        if self._preview_store:
+            self._preview_store.clear(name)
 
         active = self._collection.active
         self._publish(ActivePipelineChanged(active.name if active else None))
@@ -145,6 +170,10 @@ class PipelineService:
             self._pyflow.load_graph(active.graph.active_path())  # type: ignore[arg-type]
         else:
             self._pyflow.new_blank()
+        if active:
+            self._hydrate_preview(active)
+        else:
+            self._emit_preview_changed(None)
 
         return removed
 
@@ -161,8 +190,10 @@ class PipelineService:
 
         if active:
             self._load_graph_or_blank(active)
+            self._hydrate_preview(active)
         else:
             self._pyflow.new_blank()
+            self._emit_preview_changed(None)
 
         return active
 
@@ -208,11 +239,16 @@ class PipelineService:
 
     def update_preview(self, image_path: Path) -> Optional[Path]:
         active = self._collection.active
-        if not active or not self._preview_port:
+        if not active:
             return None
-        saved_preview = self._preview_port.save_preview(active, image_path)
-        active.set_preview(saved_preview)
-        return saved_preview
+        target_path = image_path
+        if self._preview_port:
+            target_path = self._preview_port.save_preview(active, image_path)
+        active.set_preview(target_path)
+        if self._preview_store:
+            self._preview_store.set_preview(active.name, target_path)
+        self._publish(PreviewImageChanged(active.name, target_path))
+        return target_path
 
     def subscribe(self, event_type, handler) -> None:
         self._events.subscribe(event_type, handler)
@@ -223,6 +259,17 @@ class PipelineService:
             return
         active.is_dirty = is_dirty
         self._publish(PipelineGraphDirtyChanged(active.name, is_dirty))
+
+    def _hydrate_preview(self, pipeline: PipelineUnit) -> None:
+        if self._preview_store:
+            stored = self._preview_store.get_preview(pipeline.name)
+            pipeline.set_preview(stored)
+        self._emit_preview_changed(pipeline)
+
+    def _emit_preview_changed(self, pipeline: Optional[PipelineUnit]) -> None:
+        name = pipeline.name if pipeline else None
+        path = pipeline.preview_path if pipeline else None
+        self._publish(PreviewImageChanged(name, path))
 
     def _publish(self, event) -> None:
         self._events.publish(event)

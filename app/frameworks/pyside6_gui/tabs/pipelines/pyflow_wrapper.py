@@ -86,6 +86,8 @@ class PyFlowWrapper(QWidget, QObject):
         pipeline_list_presenter: Optional[PipelineListPresenter] = None,
         pipeline_properties_controller: Optional[PipelinePropertiesController] = None,
         pipeline_properties_presenter: Optional[PipelinePropertiesPresenter] = None,
+        preview_run_handler: Optional[Callable[[], None]] = None,
+        preview_change_handler: Optional[Callable[[], None]] = None,
     ) -> None:
         super().__init__(parent)
 
@@ -95,6 +97,8 @@ class PyFlowWrapper(QWidget, QObject):
         self._pipeline_list_presenter = pipeline_list_presenter
         self._pipeline_properties_controller = pipeline_properties_controller
         self._pipeline_properties_presenter = pipeline_properties_presenter
+        self._preview_run_handler = preview_run_handler
+        self._preview_change_handler = preview_change_handler
         self._shelf_tools: Dict[str, Optional[ShelfTool]] = {}
         self._dock_tools: Dict[str, DockTool] = {}
         self._dock_adapters: Dict[str, object] = {}
@@ -235,6 +239,21 @@ class PyFlowWrapper(QWidget, QObject):
             slot = self._make_tool_slot(callback)
             shelf_tool.triggered.connect(slot)
             self._shelf_tool_slots.append(slot)
+
+        preview_tool = self._shelf_tools.get("preview")
+        if preview_tool:
+            if self._preview_run_handler:
+                slot = self._make_tool_slot(self._preview_run_handler)
+                preview_tool.triggered.connect(slot)
+                self._shelf_tool_slots.append(slot)
+            if self._preview_change_handler:
+                slot = self._make_tool_slot(self._preview_change_handler)
+                try:
+                    preview_tool.changeImageTriggered.connect(slot)  # type: ignore[attr-defined]
+                except Exception:
+                    log.debug("Preview shelf tool changeImageTriggered signal unavailable", exc_info=True)
+                else:
+                    self._shelf_tool_slots.append(slot)
 
     @staticmethod
     def _make_tool_slot(callback: Callable[[], None]):
