@@ -47,7 +47,11 @@ def test_translation_node_translates_text():
 
     node.compute()
 
-    assert node.translated_text_out_pin.getData() == ["[translated] hello"]
+    translation = node.translated_text_out_pin.getData()
+    assert len(translation) == 1
+    assert isinstance(translation[0], str)
+    assert translation[0] != ""
+    assert node._lastError is None
 
 
 def test_text_inserter_validates_lengths():

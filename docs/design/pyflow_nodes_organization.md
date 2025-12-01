@@ -8,7 +8,7 @@ Participants: Codex (assistant), Makss
 - Focused on node classes, pin types, and guard logic that enforce graph constraints; does not redesign the pipeline algorithm itself.
 - Goal: establish a baseline so we can replace the legacy-dependent pieces with a new node organization that does not rely on the old `pipeline.*`/`core.*` modules.
 - Out of scope: reintroducing legacy `pipeline.*`/`core.*` dependencies or reviving the old execution flow; those will be superseded by new components.
-- Target shape: Node classes orchestrate data flow and output wiring; they construct and delegate work to "logic" classes that perform the actual processing. Both node and logic classes will live at the frameworks level within the MangaTranslator PyFlow package.
+- Target shape: Node classes orchestrate data flow and output wiring, validate/normalize inputs, and call backend implementations (treated as logic classes) that perform the actual processing. Both node and backend/logic classes will live at the frameworks level within the MangaTranslator PyFlow package.
 
 ## 2. Requirements & Constraints
 - Functional: supply PyFlow nodes for ingesting an image, detecting text areas, inpainting, extracting and translating text, re-inserting translated text, and returning the final image.
@@ -20,7 +20,7 @@ Participants: Codex (assistant), Makss
 
 ## 3. Architecture & Flow
 - Layering: nodes live in `app/third_party/PyFlow/PyFlow/Packages/MangaTranslator`; a singleton guard sits in `app/frameworks/pyside6_gui/tabs/pipelines/output_node_guard.py`.
-- Planned layering: keep nodes and add colocated logic classes inside the MangaTranslator package under a frameworks namespace (so PyFlow can import without reaching into domain/application layers).
+- Planned layering: keep nodes and use colocated backend/logic classes (the legacy backends) inside the MangaTranslator package under a frameworks namespace (so PyFlow can import without reaching into domain/application layers).
 - Pins: `ImageArrayPin` (wraps numpy/OpenCV matrix) and `HierarchyPin` (wraps detection hierarchy object) extend `PinBase` with colors and serialization rules.
 - Node catalog:
   - `PipelineInputImageNode`: pulls preview image path from `core.pipelines_manager.pyflow_interaction_manager`, imports via `pipeline.image_importer.ImageImporter`, outputs `ImageArrayPin`, subscribes to preview path change events.
@@ -32,19 +32,20 @@ Participants: Codex (assistant), Makss
   - `PipelineOutputNode`: single `ImageArrayPin` input; registers itself through the output guard and returns the image in `compute`.
 - Typical data flow (when all deps exist): Input -> Detect -> Inpaint -> Extract -> Translate -> Insert -> Output.
 
-### 3.1 Logic interfaces (new)
+### 3.1 Logic/backends
+- Backends now act as the logic layer; nodes validate/normalize inputs before calling them.
 - `ImageImportLogic.run(path: str) -> ImageType`: validate/resolve preview path and return an image payload (cv2 matrix when available, numpy buffer, or a byte-list fallback). Raises `NodeLogicError` when the path is missing or unreadable.
-- `TextDetectionLogic.run(image) -> Hierarchy`: accepts image payload, produces a `Hierarchy` container (empty placeholder until a detector backend is wired).
-- `InpainterLogic.run(image, hierarchy) -> image`: validates both inputs, returns a copy of the image (placeholder until backend exists).
-- `TextExtractionLogic.run(image, hierarchy) -> Tuple[List[Seq[int]], List[str]]`: emits text areas and original text lists, deriving content from hierarchy chunks; lengths always align.
-- `TranslationLogic.run(texts: Iterable[str]) -> List[str]`: deterministic translation stub prepending `[translated]` to preserve 1:1 ordering.
-- `TextInsertionLogic.run(image, areas, texts) -> image`: validates input alignment, returns a copy of the image (placeholder until backend exists).
+- `LegacyTextDetectionBackend.detect(image) -> Hierarchy`: returns a hierarchy (nodes normalize to `Hierarchy` when the backend emits a different shape).
+- `LegacyInpainterBackend.inpaint(image, hierarchy) -> image`: removes or masks detected regions.
+- `LegacyTextExtractionBackend.extract(image, hierarchy) -> Tuple[List[Seq[int]], List[str]]`: emits text areas and original text lists; nodes enforce length alignment after calling.
+- `LegacyTranslationBackend.translate(texts: Iterable[str]) -> List[str]`: deterministic translation stub prepending `[translated]` when Together is unavailable.
+- `LegacyTextInsertionBackend.insert(image, areas, texts) -> image`: blends translated text into the image; nodes validate length alignment before calling.
 - `Hierarchy` now lives in `logic/hierarchy.py`, exposed via pins to decouple from legacy `pipeline.text_detector.*` imports.
 
 ### 3.2 Node orchestration contract
-- Nodes should construct their logic collaborator eagerly (no side-effects), call `logic.run(...)` inside `compute`, and catch `NodeLogicError` to surface a user-friendly node error without crashing the GUI.
-- Inputs must be validated before calling logic; array inputs get copied (via `copy_image`) to avoid mutating upstream pins.
-- Legacy imports remain optional/guarded; the new logic path is the primary execution path.
+- Nodes construct their backend/logic collaborator eagerly (no side-effects), call the backend method (`detect`, `inpaint`, `extract`, `translate`, `insert`) inside `compute`, and catch `NodeLogicError` to surface a user-friendly node error without crashing the GUI.
+- Inputs are validated and normalized in nodes before backend calls (e.g., image/hierarchy presence, text area/text length alignment), and array inputs get copied (via `copy_image`) to avoid mutating upstream pins.
+- Legacy imports remain optional/guarded; the backend path is the primary execution path.
 - Nodes should keep event subscriptions optional (e.g., input node listening to preview changes) and callable guards safe for headless tests.
 
 ## 4. Data & Storage

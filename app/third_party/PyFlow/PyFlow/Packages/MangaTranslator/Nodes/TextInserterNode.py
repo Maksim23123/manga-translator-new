@@ -2,7 +2,11 @@ from PyFlow.Core import NodeBase
 from PyFlow.Core.NodeBase import NodePinsSuggestionsHelper
 from PyFlow.Core.Common import *
 
-from PyFlow.Packages.MangaTranslator.logic import NodeLogicError, TextInsertionLogic, copy_image
+from PyFlow.Packages.MangaTranslator.logic import (
+    LegacyTextInsertionBackend,
+    NodeLogicError,
+    copy_image,
+)
 
 
 
@@ -10,7 +14,7 @@ class TextInserterNode(NodeBase):
     def __init__(self, name):
         super(TextInserterNode, self).__init__(name)
 
-        self.text_inserter = TextInsertionLogic()
+        self.text_inserter = LegacyTextInsertionBackend()
 
         self.image_inp_pin = self.createInputPin('Image', 'ImageArrayPin')
         self.text_areas_inp_pin = self.createInputPin('Text areas', 'IntPin', structure=StructureType.Array)
@@ -53,9 +57,18 @@ class TextInserterNode(NodeBase):
         if text_areas is None or text is None:
             self.setError("Invalid text inputs.")
             return
+        try:
+            areas_list = list(text_areas)
+            text_list = list(text)
+        except Exception:
+            self.setError("Invalid text inputs.")
+            return
+        if len(areas_list) != len(text_list):
+            self.setError("Text areas/text length mismatch.")
+            return
 
         try:
-            image_with_text = self.text_inserter.run(copy_image(image), text_areas, text)
+            image_with_text = self.text_inserter.insert(copy_image(image), areas_list, text_list)
         except NodeLogicError as exc:
             self.setError(str(exc))
             return

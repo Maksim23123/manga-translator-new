@@ -2,7 +2,12 @@ from PyFlow.Core import NodeBase
 from PyFlow.Core.NodeBase import NodePinsSuggestionsHelper
 from PyFlow.Core.Common import *
 
-from PyFlow.Packages.MangaTranslator.logic import Hierarchy, NodeLogicError, TextExtractionLogic, copy_image
+from PyFlow.Packages.MangaTranslator.logic import (
+    Hierarchy,
+    LegacyTextExtractionBackend,
+    NodeLogicError,
+    copy_image,
+)
 
 
 
@@ -10,7 +15,7 @@ class TextExtractorNode(NodeBase):
     def __init__(self, name):
         super(TextExtractorNode, self).__init__(name)
 
-        self.text_extractor = TextExtractionLogic()
+        self.text_extractor = LegacyTextExtractionBackend()
 
         self.image_inp_pin = self.createInputPin('Image', 'ImageArrayPin')
         self.hierarchy_inp_pin = self.createInputPin('Hierarchy', 'HierarchyPin')
@@ -52,9 +57,12 @@ class TextExtractorNode(NodeBase):
             self.setError("Invalid hierarchy input.")
             return
         try:
-            text_areas, original_text = self.text_extractor.run(copy_image(image), hierarchy)
+            text_areas, original_text = self.text_extractor.extract(copy_image(image), hierarchy)
         except NodeLogicError as exc:
             self.setError(str(exc))
+            return
+        if len(text_areas) != len(original_text):
+            self.setError("Text areas/text length mismatch.")
             return
 
         self.text_areas_out_pin.setData(text_areas)

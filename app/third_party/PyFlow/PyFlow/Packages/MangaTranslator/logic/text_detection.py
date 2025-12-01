@@ -1,25 +1,16 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
-from PyFlow.Packages.MangaTranslator.protocols import TextDetectionBackend
-
-from .base import NodeLogicError
 from .hierarchy import Hierarchy
 from .legacy_backends import LegacyTextDetectionBackend
 
 
-class TextDetectionLogic:
-    """Detects text regions inside an image."""
-
-    def __init__(self, backend: Optional[TextDetectionBackend] = None) -> None:
-        self._backend = backend or LegacyTextDetectionBackend()
+class TextDetectionLogic(LegacyTextDetectionBackend):
+    """Compatibility wrapper: the backend now serves as the logic class."""
 
     def run(self, image: Any) -> Hierarchy:
-        if image is None:
-            raise NodeLogicError("Image input missing.")
-
-        hierarchy = self._backend.detect(image)
+        hierarchy = self.detect(image)
         return self._normalize_hierarchy(hierarchy)
 
     @staticmethod

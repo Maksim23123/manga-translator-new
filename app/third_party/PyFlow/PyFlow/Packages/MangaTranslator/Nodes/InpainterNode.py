@@ -2,7 +2,12 @@ from PyFlow.Core import NodeBase
 from PyFlow.Core.NodeBase import NodePinsSuggestionsHelper
 from PyFlow.Core.Common import *
 
-from PyFlow.Packages.MangaTranslator.logic import Hierarchy, InpainterLogic, NodeLogicError, copy_image
+from PyFlow.Packages.MangaTranslator.logic import (
+    Hierarchy,
+    LegacyInpainterBackend,
+    NodeLogicError,
+    copy_image,
+)
 
 
 
@@ -10,7 +15,7 @@ class InpainterNode(NodeBase):
     def __init__(self, name):
         super(InpainterNode, self).__init__(name)
 
-        self.inpainter = InpainterLogic()
+        self.inpainter = LegacyInpainterBackend()
 
         self.image_inp_pin = self.createInputPin('Image', 'ImageArrayPin')
         self.hierarchy_inp_pin = self.createInputPin('Hierarchy', 'HierarchyPin')
@@ -51,7 +56,7 @@ class InpainterNode(NodeBase):
             return
 
         try:
-            inpainted_image = self.inpainter.run(copy_image(input_image), hierarchy)
+            inpainted_image = self.inpainter.inpaint(copy_image(input_image), hierarchy)
         except NodeLogicError as exc:
             self.setError(str(exc))
             return

@@ -504,6 +504,8 @@ class LegacyTranslationBackend(TranslationBackend):
             return []
 
         api_key = _load_api_key(self.api_keys_path, "together_api_key")
+        if api_key is None and self.allow_stub:
+            return [self._fallback_translation(text) for text in text_list]
         try:
             from together import Together  # type: ignore
         except Exception as exc:

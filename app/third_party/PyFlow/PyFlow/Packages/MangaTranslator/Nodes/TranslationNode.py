@@ -2,14 +2,14 @@ from PyFlow.Core import NodeBase
 from PyFlow.Core.NodeBase import NodePinsSuggestionsHelper
 from PyFlow.Core.Common import *
 
-from PyFlow.Packages.MangaTranslator.logic import NodeLogicError, TranslationLogic
+from PyFlow.Packages.MangaTranslator.logic import LegacyTranslationBackend, NodeLogicError
 
 
 class TranslationNode(NodeBase):
     def __init__(self, name):
         super(TranslationNode, self).__init__(name)
 
-        self.translator = TranslationLogic()
+        self.translator = LegacyTranslationBackend()
 
         self.text_inp_pin = self.createInputPin('Text', 'StringPin', structure=StructureType.Array)
         self.translated_text_out_pin = self.createOutputPin('Translation', 'StringPin', structure=StructureType.Array)
@@ -43,7 +43,7 @@ class TranslationNode(NodeBase):
             return
         
         try:
-            translation = self.translator.run(text_list)
+            translation = self.translator.translate(text_list)
         except NodeLogicError as exc:
             self.setError(str(exc))
             return
