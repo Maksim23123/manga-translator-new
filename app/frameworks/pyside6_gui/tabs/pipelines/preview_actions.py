@@ -10,7 +10,12 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QLabel,
+    QGraphicsPixmapItem,
+    QGraphicsScene,
+    QGraphicsView,
+    QHBoxLayout,
     QMessageBox,
+    QPushButton,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -28,12 +33,90 @@ from app.application.pipelines.use_cases import (
 )
 from app.application.project.ports import CurrentProjectStore
 from app.domain.doc_units.entities import HierarchyNode
-from app.domain.doc_units.value_objects import DocUnitId
 from app.interface_adapters.doc_units.repositories.project_doc_unit_repository import (
     ProjectDocUnitRepository,
 )
 
 log = logging.getLogger(__name__)
+
+
+class PreviewGraphicsView(QGraphicsView):
+    """Graphics view that supports zoom and pan for preview images."""
+
+    def __init__(self, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self._scene = QGraphicsScene(self)
+        self.setScene(self._scene)
+        self._pixmap_item: Optional[QGraphicsPixmapItem] = None
+        self._current_zoom = 1.0
+        self._min_zoom = 0.1
+        self._max_zoom = 8.0
+        self._auto_fit_enabled = True
+        self.setDragMode(QGraphicsView.ScrollHandDrag)
+        self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
+
+    def set_pixmap(self, pixmap: QPixmap) -> None:
+        self._scene.clear()
+        self._pixmap_item = QGraphicsPixmapItem(pixmap)
+        self._scene.addItem(self._pixmap_item)
+        self._scene.setSceneRect(self._pixmap_item.boundingRect())
+        self.reset_view()
+        self._auto_fit_enabled = True
+        self._fit_if_needed()
+
+    def wheelEvent(self, event) -> None:  # noqa: ANN001
+        if not self._pixmap_item:
+            return
+        self._auto_fit_enabled = False
+        angle = event.angleDelta().y()
+        factor = 1.15 if angle > 0 else 0.85
+        self._apply_zoom(factor)
+
+    def fit_to_view(self) -> None:
+        if not self._pixmap_item:
+            return
+        self.resetTransform()
+        rect = self._pixmap_item.boundingRect()
+        if rect.isNull():
+            return
+        view_rect = self.viewport().rect()
+        if view_rect.width() <= 0 or view_rect.height() <= 0:
+            return
+        scale_x = view_rect.width() / rect.width()
+        scale_y = view_rect.height() / rect.height()
+        target = min(scale_x, scale_y)
+        self._current_zoom = target
+        super().scale(target, target)
+
+    def reset_view(self) -> None:
+        self._current_zoom = 1.0
+        self.resetTransform()
+        if self._pixmap_item:
+            self.centerOn(self._pixmap_item)
+
+    def _apply_zoom(self, factor: float) -> None:
+        new_zoom = self._current_zoom * factor
+        clamped = max(self._min_zoom, min(self._max_zoom, new_zoom))
+        factor_to_apply = clamped / self._current_zoom
+        self._current_zoom = clamped
+        super().scale(factor_to_apply, factor_to_apply)
+
+    def showEvent(self, event) -> None:  # noqa: ANN001
+        super().showEvent(event)
+        self._fit_if_needed()
+
+    def resizeEvent(self, event) -> None:  # noqa: ANN001
+        super().resizeEvent(event)
+        self._fit_if_needed()
+
+    def _fit_if_needed(self) -> None:
+        if not self._auto_fit_enabled:
+            return
+        if not self._pixmap_item:
+            return
+        if self.viewport().width() <= 0 or self.viewport().height() <= 0:
+            return
+        self.fit_to_view()
 
 
 class PreviewActions:
@@ -108,25 +191,33 @@ class PreviewActions:
     def _show_result_dialog(self, pipeline_name: str, result: PipelineExecutionResult) -> None:
         dialog = QDialog(self._parent)
         dialog.setWindowTitle("Preview result")
+        dialog.setFixedSize(900, 700)
 
         layout = QVBoxLayout(dialog)
         layout.addWidget(QLabel(f"Pipeline: {pipeline_name}"))
 
         pixmap = self._pixmap_from_output(result.output.get("image"))
-        preview_label = QLabel()
-        preview_label.setAlignment(Qt.AlignCenter)
         if pixmap and not pixmap.isNull():
-            preview_label.setPixmap(pixmap)
-            preview_label.setScaledContents(True)
-            preview_label.setFixedSize(pixmap.size())
-        else:
-            preview_label.setText("Preview output unavailable")
-        layout.addWidget(preview_label)
+            view = PreviewGraphicsView(dialog)
+            view.set_pixmap(pixmap)
+            layout.addWidget(view, stretch=1)
 
-        buttons = QDialogButtonBox(QDialogButtonBox.Close)
-        buttons.rejected.connect(dialog.reject)
-        buttons.accepted.connect(dialog.accept)
-        layout.addWidget(buttons)
+            controls = QHBoxLayout()
+            fit_btn = QPushButton("Fit to window", dialog)
+            controls.addWidget(fit_btn)
+            controls.addStretch(1)
+            layout.addLayout(controls)
+
+            fit_btn.clicked.connect(view.fit_to_view)
+        else:
+            placeholder = QLabel("Preview output unavailable")
+            placeholder.setAlignment(Qt.AlignCenter)
+            layout.addWidget(placeholder)
+
+        close_box = QDialogButtonBox(QDialogButtonBox.Close)
+        close_box.rejected.connect(dialog.reject)
+        close_box.accepted.connect(dialog.accept)
+        layout.addWidget(close_box)
 
         dialog.exec()
 
