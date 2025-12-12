@@ -16,11 +16,7 @@ try:
 except ModuleNotFoundError:
     np = None  # type: ignore[assignment]
 
-from app.application.pipelines.pipeline_executor import (
-    PipelineExecutionInput,
-    PipelineExecutionRequest,
-    PyFlowPipelineExecutor,
-)
+from app.application.pipelines.pipeline_executor import PipelineExecutionInput, PipelineExecutionRequest, PyFlowPipelineExecutor
 from app.application.pipelines.pyflow_graph_runner import PyFlowGraphRunner
 from app.application.pipelines.translation_engine import TranslationEngine
 
@@ -37,27 +33,22 @@ def discover_graphs() -> list[Path]:
     return graphs
 
 
-def prompt_for_choice(options: list[Path], label: str) -> Path:
-    print(f"Select {label}:")
-    for idx, path in enumerate(options, start=1):
-        print(f"  [{idx}] {path}")
-    while True:
-        choice = input(f"Enter {label} number: ").strip()
-        if not choice.isdigit():
-            continue
-        idx = int(choice)
-        if 1 <= idx <= len(options):
-            return options[idx - 1]
-
-
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run a PyFlow pipeline headlessly.")
-    parser.add_argument("--pipeline", type=Path, help="Path to .pygraph file")
+    parser = argparse.ArgumentParser(
+        description="Run multiple PyFlow pipelines headlessly through the translation engine.",
+        epilog="Example: python -m app.scripts.run_engine_batch --pipeline A.pygraph --pipeline B.pygraph --image sample.png",
+    )
+    parser.add_argument(
+        "--pipeline",
+        action="append",
+        type=Path,
+        help="Path to .pygraph file; pass multiple times to run several pipelines",
+    )
     parser.add_argument("--image", type=Path, help="Path to input image")
     parser.add_argument(
-        "--output",
+        "--output-dir",
         type=Path,
-        help="Path to write resulting image (default: data/pipeline_results/<pipeline>_output.png)",
+        help="Directory to write resulting images (default: data/pipeline_results/engine_batch)",
     )
     return parser.parse_args(argv)
 
@@ -65,10 +56,8 @@ def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
 def save_image(image, output_path: Path) -> Optional[Path]:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     if image is None:
-        print("No image returned from pipeline.")
         return None
 
-    # If the pipeline returned raw bytes (or a list of byte values), persist them directly.
     if isinstance(image, (bytes, bytearray, memoryview)):
         try:
             output_path.write_bytes(bytes(image))
@@ -78,14 +67,12 @@ def save_image(image, output_path: Path) -> Optional[Path]:
 
     if isinstance(image, (list, tuple)):
         try:
-            # Attempt to interpret a flat list/tuple of ints as raw bytes.
             if all(isinstance(v, int) and 0 <= v <= 255 for v in image):
                 output_path.write_bytes(bytes(image))
                 return output_path
         except Exception:
             pass
 
-    # If a path/string was returned, copy the file into place.
     if isinstance(image, (str, Path)):
         candidate = Path(image)
         if candidate.exists():
@@ -109,7 +96,6 @@ def save_image(image, output_path: Path) -> Optional[Path]:
                     if cv2.imwrite(str(output_path), arr):
                         return output_path
                 else:
-                    # Save as raw numpy for inspection.
                     np.save(output_path.with_suffix(".npy"), arr)
                     return output_path.with_suffix(".npy")
         except Exception:
@@ -121,61 +107,77 @@ def save_image(image, output_path: Path) -> Optional[Path]:
         return None
 
 
-def default_output_path(graph_path: Path) -> Path:
-    root = Path("data") / "pipeline_results"
+def default_output_dir() -> Path:
+    root = Path("data") / "pipeline_results" / "engine_batch"
     root.mkdir(parents=True, exist_ok=True)
-    stem = graph_path.stem if graph_path else "pipeline"
-    return root / f"{stem}_output.png"
+    return root
 
 
-def main(argv: Optional[list[str]] = None) -> int:
-    args = parse_args(argv)
-
-    graph_path = args.pipeline
-    if graph_path is None:
-        available = discover_graphs()
-        if available:
-            graph_path = prompt_for_choice(available, "pipeline")
-        else:
-            manual = input("No pipelines found. Enter path to a .pygraph file: ").strip()
-            if not manual:
-                print("No pipeline selected.")
-                return 1
-            graph_path = Path(manual)
-
-    image_path = args.image
-    if image_path is None:
-        image_input = input("Enter path to input image: ").strip()
-        image_path = Path(image_input)
-
+def run_pipeline(engine: TranslationEngine, graph_path: Path, image_path: Path, output_dir: Path) -> bool:
     if not graph_path.exists():
-        print(f"Pipeline graph not found: {graph_path}")
-        return 1
-    if not image_path.exists():
-        print(f"Image not found: {image_path}")
-        return 1
-
-    engine = TranslationEngine(lambda path: PyFlowPipelineExecutor(PyFlowGraphRunner(), graph_path=path))
+        print(f"[skip] Pipeline graph not found: {graph_path}")
+        return False
 
     request = PipelineExecutionRequest(
         id=str(uuid.uuid4()),
         input=PipelineExecutionInput(images=[image_path]),
     )
-
-    pipeline_id = graph_path.stem
-    result = engine.run(pipeline_id, graph_path, request)
+    result = engine.run(graph_path.stem, graph_path, request)
     if result.error:
-        print(f"Pipeline failed: {result.error.code} - {result.error.message}")
-        return 1
+        print(f"[fail] {graph_path.name}: {result.error.code} - {result.error.message}")
+        return False
 
-    output_path = args.output or default_output_path(graph_path)
+    output_path = output_dir / f"{graph_path.stem}_output.png"
     saved = save_image(result.output.get("image"), output_path)
     if saved:
-        print(f"Pipeline succeeded. Output saved to: {saved}")
-        return 0
+        print(f"[ok] {graph_path.name} -> {saved}")
+        return True
     else:
-        print("Pipeline succeeded, but failed to save output image.")
+        print(f"[warn] {graph_path.name} succeeded but output could not be saved.")
+        return False
+
+
+def main(argv: Optional[list[str]] = None) -> int:
+    args = parse_args(argv)
+
+    graph_paths = args.pipeline or []
+    if not graph_paths:
+        selection = input("Enter .pygraph paths (comma-separated), or press Enter to auto-discover: ").strip()
+        if selection:
+            graph_paths = [Path(token.strip()) for token in selection.split(",") if token.strip()]
+        else:
+            discovered = discover_graphs()
+            if not discovered:
+                print("No pipelines discovered under data/pipelines or data/temp/pipelines.")
+                return 1
+            print("Discovered pipelines (will run all):")
+            for p in discovered:
+                print(f" - {p}")
+            graph_paths = discovered
+
+    image_path = args.image
+    if image_path is None:
+        image_input = input("Enter path to input image: ").strip()
+        if not image_input:
+            print("No image provided.")
+            return 1
+        image_path = Path(image_input)
+    if not image_path.exists():
+        print(f"Image not found: {image_path}")
         return 1
+
+    output_dir = args.output_dir or default_output_dir()
+
+    engine = TranslationEngine(lambda path: PyFlowPipelineExecutor(PyFlowGraphRunner(), graph_path=path))
+
+    successes = 0
+    for graph_path in graph_paths:
+        if run_pipeline(engine, graph_path, image_path, output_dir):
+            successes += 1
+
+    total = len(graph_paths)
+    print(f"Completed {successes}/{total} pipelines.")
+    return 0 if successes == total else 1
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@ from app.application.pipelines.events import (
     PipelineRemoved,
     PipelineRenamed,
 )
+from app.application.pipelines.translation_engine import TranslationEngine
 from app.application.pipelines.ports import (
     ActivePipelineStore,
     GraphStoragePort,
@@ -44,6 +45,7 @@ class PipelineService:
         preview_store: Optional[PipelinePreviewStore] = None,
         event_bus: Optional[PipelineEventBus] = None,
         active_store: Optional[ActivePipelineStore] = None,
+        engine: Optional[TranslationEngine] = None,
     ) -> None:
         self._metadata_repo = metadata_repo
         self._storage = storage
@@ -53,6 +55,7 @@ class PipelineService:
         self._events = event_bus or PipelineEventBus()
         self._collection = PipelineCollection()
         self._active_store = active_store
+        self._engine = engine
 
         self._pyflow.on_dirty_changed(self._on_dirty_changed)
 
@@ -213,6 +216,7 @@ class PipelineService:
         self._metadata_repo.save(self._collection)
         self._publish(PipelineGraphPointerUpdated(active.name, draft_pointer))
         self._publish(PipelineGraphDirtyChanged(active.name, active.is_dirty))
+        self._invalidate_engine(active.name)
         return active
 
     def promote_all(self) -> list[PipelineUnit]:
@@ -234,6 +238,7 @@ class PipelineService:
             self._publish(PipelineGraphPointerUpdated(pipeline.name, promoted_pointer))
             self._publish(PipelineGraphDirtyChanged(pipeline.name, pipeline.is_dirty))
             log.info("Promoted pipeline '%s' draft to final %s", pipeline.name, promoted_pointer.final_path)
+            self._invalidate_engine(pipeline.name)
             promoted.append(pipeline)
         return promoted
 
@@ -309,3 +314,11 @@ class PipelineService:
             log.warning("Pipeline '%s' graph load failed: %s", pipeline.name, ex)
             self._publish(PipelineGraphLoadWarning(pipeline.name, path, reason))
             self._pyflow.new_blank()
+
+    def _invalidate_engine(self, pipeline_name: str) -> None:
+        if not self._engine:
+            return
+        try:
+            self._engine.invalidate(pipeline_name)
+        except Exception:
+            log.debug("Failed to invalidate engine for pipeline '%s'", pipeline_name, exc_info=True)

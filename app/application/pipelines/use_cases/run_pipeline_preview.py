@@ -3,16 +3,16 @@ from __future__ import annotations
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Optional
+from typing import Any, Optional
 
 from app.application.pipelines.pipeline_executor import (
     EngineParams,
     PipelineExecutionInput,
     PipelineExecutionRequest,
     PipelineExecutionResult,
-    PipelineExecutor,
 )
 from app.application.pipelines.pipeline_service import PipelineService
+from app.application.pipelines.translation_engine import TranslationEngine
 
 
 @dataclass(slots=True)
@@ -28,10 +28,10 @@ class RunPipelinePreview:
     def __init__(
         self,
         service: PipelineService,
-        executor_factory: Callable[[Path], PipelineExecutor],
+        engine: TranslationEngine,
     ) -> None:
         self._service = service
-        self._make_executor = executor_factory
+        self._engine = engine
 
     def execute(self, request: Optional[RunPipelinePreviewRequest] = None) -> PipelineExecutionResult:
         active = self._service.collection.active
@@ -52,23 +52,14 @@ class RunPipelinePreview:
         if graph_path is None or not graph_path.exists():
             raise FileNotFoundError(graph_path or Path("pipeline.pygraph"))
 
-        executor = self._make_executor(graph_path)
+        if not self._engine:
+            raise RuntimeError("Translation engine is not configured.")
+
         executor_request = request or RunPipelinePreviewRequest()
-
-        executor.prepare(graph_path, executor_params=executor_request.executor_params)
-        try:
-            execution_request = PipelineExecutionRequest(
-                id=str(uuid.uuid4()),
-                input=PipelineExecutionInput(images=[image_path], metadata=executor_request.metadata),
-                executor_params=executor_request.executor_params,
-                engine_params=executor_request.engine_params,
-            )
-            result = executor.run(execution_request)
-        finally:
-            try:
-                executor.cleanup()
-            except Exception:
-                # Best-effort cleanup; failures should not mask execution result.
-                pass
-
-        return result
+        execution_request = PipelineExecutionRequest(
+            id=str(uuid.uuid4()),
+            input=PipelineExecutionInput(images=[image_path], metadata=executor_request.metadata),
+            executor_params=executor_request.executor_params,
+            engine_params=executor_request.engine_params,
+        )
+        return self._engine.run(active.name, graph_path, execution_request)

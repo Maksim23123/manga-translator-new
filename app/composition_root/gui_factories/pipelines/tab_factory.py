@@ -10,6 +10,7 @@ from app.application.pipelines.events import ActivePipelineChanged, PipelineEven
 from app.application.pipelines.pipeline_service import PipelineService
 from app.application.pipelines.pyflow_graph_runner import PyFlowGraphRunner
 from app.application.pipelines.pipeline_executor import PyFlowPipelineExecutor
+from app.application.pipelines.translation_engine import TranslationEngine
 from app.application.pipelines.use_cases import RunPipelinePreview, SelectPreviewImage
 from app.application.project.lifecycle_events import (
     ProjectDirtyStateChanged,
@@ -75,6 +76,9 @@ def build_graph_editor_tab(
     active_store = MemActivePipelineStore()
     preview_store = MemPipelinePreviewStore()
 
+    executor_factory = lambda graph_path: PyFlowPipelineExecutor(PyFlowGraphRunner(), graph_path=graph_path)
+    engine = TranslationEngine(executor_factory)
+
     service = PipelineService(
         metadata_repo=metadata_repo,
         storage=graph_storage,
@@ -83,11 +87,11 @@ def build_graph_editor_tab(
         preview_store=preview_store,
         event_bus=event_bus,
         active_store=active_store,
+        engine=engine,
     )
 
     select_preview_use_case = SelectPreviewImage(service)
-    executor_factory = lambda graph_path: PyFlowPipelineExecutor(PyFlowGraphRunner(), graph_path=graph_path)
-    run_preview_use_case = RunPipelinePreview(service, executor_factory)
+    run_preview_use_case = RunPipelinePreview(service, engine)
 
     preview_actions: PreviewActions | None = None
     if project_store and active_doc_unit_store:
