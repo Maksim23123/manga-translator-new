@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 import logging
-from typing import Optional
+import uuid
+from typing import Any, Optional
 
 from app.application.pipelines.events import (
     ActivePipelineChanged,
@@ -24,6 +25,13 @@ from app.application.pipelines.ports import (
     PipelinePreviewPort,
     PipelinePreviewStore,
     PyFlowGateway,
+)
+from app.application.pipelines.pipeline_executor import (
+    EngineParams,
+    PipelineExecutionContext,
+    PipelineExecutionInput,
+    PipelineExecutionRequest,
+    PipelineExecutionResult,
 )
 from app.domain.pipelines.graph_pointer import GraphPointer, GraphPointerStatus
 from app.domain.pipelines.pipeline_collection import PipelineCollection
@@ -275,6 +283,59 @@ class PipelineService:
         name = pipeline.name if pipeline else None
         path = pipeline.preview_path if pipeline else None
         self._publish(PreviewImageChanged(name, path))
+
+    def build_signature(self, pipeline_name: str) -> str:
+        """Compute a lightweight signature for dirty detection."""
+        pipeline = self._collection.get(pipeline_name)
+        if not pipeline:
+            raise KeyError(f"Pipeline '{pipeline_name}' not found")
+        path = pipeline.graph.active_path()
+        timestamp = None
+        if path and path.exists():
+            try:
+                timestamp = path.stat().st_mtime_ns
+            except Exception:
+                timestamp = None
+        stamp = timestamp if timestamp is not None else "missing"
+        return f"{pipeline.name}:{stamp}"
+
+    def run_pipeline(
+        self,
+        pipeline_name: str,
+        images: list[Path],
+        *,
+        metadata: Optional[dict[str, Any]] = None,
+        executor_params: Optional[dict[str, Any]] = None,
+        engine_params: Optional[EngineParams] = None,
+        context: Optional[PipelineExecutionContext] = None,
+    ) -> PipelineExecutionResult:
+        pipeline = self._collection.get(pipeline_name)
+        if not pipeline:
+            raise KeyError(f"Pipeline '{pipeline_name}' not found")
+
+        graph_path = pipeline.graph.active_path()
+        if graph_path is None:
+            raise FileNotFoundError("Pipeline graph path is missing.")
+
+        if pipeline.is_dirty and self._collection.active and self._collection.active.name == pipeline_name:
+            self.save_active()
+            pipeline = self._collection.get(pipeline_name) or pipeline
+            graph_path = pipeline.graph.active_path()
+
+        if graph_path is None or not graph_path.exists():
+            raise FileNotFoundError(graph_path or Path("pipeline.pygraph"))
+
+        if not self._engine:
+            raise RuntimeError("Translation engine is not configured.")
+
+        request = PipelineExecutionRequest(
+            id=str(uuid.uuid4()),
+            input=PipelineExecutionInput(images=images, metadata=metadata or {}),
+            executor_params=executor_params or {},
+            engine_params=engine_params,
+            context=context,
+        )
+        return self._engine.run(pipeline_name, graph_path, request)
 
     def _publish(self, event) -> None:
         self._events.publish(event)

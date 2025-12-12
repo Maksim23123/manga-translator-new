@@ -46,11 +46,12 @@ Participants: Codex
 - GUI/Qt tests (or harnessed presenter tests) for mixed selection display state and ordering passed to the image renderer.
 
 ## 8. Implementation Checklist
-- [ ] Add Page Editor tab view (top bar actions, left/right docks, central renderer) with factory wiring in composition_root.
-- [ ] Implement PageEditor controller/presenter pair with selection handling and view-owned wiring to renderer and config dock.
-- [ ] Create application service/port for translation actions (all/dirty/selected) and pipeline signature tracking.
-- [ ] Persist pipeline assignment and last translation signature on image nodes; refresh dirty indicators and state-change notifications.
-- [ ] Integrate pipeline list updates and project/unit lifecycle events into the tab.
+- [x] Add Page Editor tab view (top bar actions, left/right docks, central renderer) with factory wiring in composition_root.
+- [x] Implement PageEditor controller/presenter pair with selection handling and view-owned wiring to renderer and config dock.
+- [x] Create application service/port for translation actions (all/dirty/selected) and pipeline signature tracking.
+- [x] Persist pipeline assignment and last translation signature on image nodes; refresh dirty indicators and state-change notifications.
+- [x] Integrate pipeline list updates and project/unit lifecycle events into the tab.
 
 ## 9. Changelog
 - 2025-12-02 - Initial design draft for Page Editor tab.
+- 2025-12-02 - Added first-pass Page Editor implementation (tab UI, services, wiring).
