@@ -9,6 +9,7 @@ from typing import Optional
 class ImageSelection:
     node_id: str
     path: Optional[Path]
+    translated_path: Optional[Path]
     pipeline_id: Optional[str]
     last_pipeline_signature: Optional[str]
 

@@ -55,6 +55,10 @@ class PyFlowGraphRunner:
         if self._graph_manager is None or self._graph_path is None:
             raise RuntimeError("Graph not loaded; call load(graph_path) first")
 
+        # Reload graph each run to avoid stale node state leaking across executions.
+        # PyFlow nodes can retain cached data; re-deserializing ensures a clean pipeline per image.
+        self.load(self._graph_path)
+
         image_path = self._pick_image(inputs.get("images"))
         if image_path is None:
             raise ValueError("No image supplied to run the pipeline")

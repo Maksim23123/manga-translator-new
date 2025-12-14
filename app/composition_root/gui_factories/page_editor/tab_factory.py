@@ -24,6 +24,9 @@ from app.interface_adapters.doc_units.repositories.project_doc_unit_repository i
 from app.interface_adapters.media.filesystem_media_store import FileSystemMediaStore
 from app.interface_adapters.page_editor.page_editor_controller import PageEditorController
 from app.interface_adapters.page_editor.page_editor_presenter import PageEditorPresenter
+from app.interface_adapters.page_editor.translation_output_store import (
+    FilesystemTranslationOutputStore,
+)
 
 
 @dataclass(slots=True)
@@ -42,12 +45,14 @@ def build_page_editor_tab(
 ) -> PageEditorTabBundle:
     doc_unit_repository = ProjectDocUnitRepository(project_store)
     media_store = FileSystemMediaStore(project_store, id_generator)
+    translation_store = FilesystemTranslationOutputStore(project_store)
 
     page_editor_service = PageEditorService(
         repository=doc_unit_repository,
         active_store=active_doc_unit_store,
         media_store=media_store,
         pipeline_service=pipeline_service,
+        translation_output_store=translation_store,
         doc_unit_events=doc_unit_event_bus,
     )
 

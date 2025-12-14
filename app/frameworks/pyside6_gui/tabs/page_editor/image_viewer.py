@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Iterable
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QRectF
 from PySide6.QtGui import QPixmap, QWheelEvent
 from PySide6.QtWidgets import QGraphicsPixmapItem, QGraphicsScene, QGraphicsView
 
@@ -25,12 +25,14 @@ class ImageListViewer(QGraphicsView):
 
     def clear_images(self) -> None:
         self._scene.clear()
+        self._scene.setSceneRect(QRectF())
         self._pixmap_items.clear()
         self._current_zoom = 1.0
         self.resetTransform()
 
     def set_images(self, images: Iterable[str | Path]) -> None:
         self.clear_images()
+        self._auto_fit_enabled = True
         pixmaps = []
         max_width = 0
         for img in images:
@@ -75,5 +77,6 @@ class ImageListViewer(QGraphicsView):
         rect = self._scene.itemsBoundingRect()
         if rect.isNull():
             return
+        self._scene.setSceneRect(rect)
         self.fitInView(rect, Qt.KeepAspectRatio)
         self._current_zoom = 1.0

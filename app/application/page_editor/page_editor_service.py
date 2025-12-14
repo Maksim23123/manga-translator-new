@@ -15,6 +15,7 @@ from app.application.doc_units.ports import (
     MediaStore,
 )
 from app.application.page_editor.dto import ImageSelection, TranslationSummary
+from app.application.page_editor.ports import TranslationOutputStore
 from app.application.pipelines.pipeline_service import PipelineService
 from app.domain.doc_units.entities import HierarchyNode
 from app.domain.doc_units.value_objects import DocUnitId
@@ -25,6 +26,7 @@ class PageEditorService:
 
     PIPELINE_KEY = "pipeline_id"
     SIGNATURE_KEY = "last_pipeline_signature"
+    TRANSLATED_PATH_KEY = "translated_path"
 
     def __init__(
         self,
@@ -32,12 +34,14 @@ class PageEditorService:
         active_store: ActiveDocUnitStore,
         media_store: MediaStore,
         pipeline_service: PipelineService,
+        translation_output_store: TranslationOutputStore,
         doc_unit_events,
     ) -> None:
         self._repository = repository
         self._active_store = active_store
         self._media_store = media_store
         self._pipeline_service = pipeline_service
+        self._translation_store = translation_output_store
         self._events = doc_unit_events
         current_unit = self._active_store.get()
         self._active_unit_id: Optional[str] = current_unit.value if current_unit else None
@@ -80,6 +84,7 @@ class PageEditorService:
             current_sig = node.settings.get(self.SIGNATURE_KEY)
             updated = dict(node.settings)
             updated[self.PIPELINE_KEY] = pipeline_id
+            updated[self.TRANSLATED_PATH_KEY] = None
             # Clear signature so dirty detection treats as needing re-translation.
             updated[self.SIGNATURE_KEY] = None
             if updated == node.settings and current_pipeline == pipeline_id and current_sig is None:
@@ -125,8 +130,10 @@ class PageEditorService:
         if not images:
             return TranslationSummary(requested=0, translated=0, skipped=[], failures=[])
 
+        unit_id = self._require_active_unit()
         grouped: dict[str, list[ImageSelection]] = defaultdict(list)
         skipped: list[str] = []
+        translation_updates: list[tuple[str, str, str]] = []
         for img in images:
             if img.pipeline_id:
                 grouped[img.pipeline_id].append(img)
@@ -144,34 +151,39 @@ class PageEditorService:
                 failures.append(f"{pipeline_id}: {exc}")
                 continue
 
-            targets = pipeline_images
-            if dirty_only:
-                targets = [
-                    img for img in pipeline_images if img.last_pipeline_signature != signature
-                ]
-            if not targets:
-                skipped.extend([img.node_id for img in pipeline_images])
-                continue
-
-            image_paths = [img.path for img in targets if img.path and img.path.exists()]
-            missing = [img.node_id for img in targets if not img.path or not img.path.exists()]
-            if missing:
-                skipped.extend(missing)
-            if not image_paths:
-                continue
-
-            try:
-                result = self._pipeline_service.run_pipeline(pipeline_id, image_paths)
-                if result.error:
-                    failures.append(f"{pipeline_id}: {result.error.code} {result.error.message}")
+            for img in pipeline_images:
+                if dirty_only and img.last_pipeline_signature == signature and self._translated_file_exists(img.translated_path):
+                    skipped.append(img.node_id)
                     continue
-            except Exception as exc:
-                failures.append(f"{pipeline_id}: {exc}")
-                continue
+                if not img.path or not img.path.exists():
+                    skipped.append(img.node_id)
+                    continue
 
-            translated_ids.extend([img.node_id for img in targets])
-            # Update signatures immediately for the nodes we attempted.
-            self._update_translation_signatures(target_ids=[img.node_id for img in targets], signature=signature)
+                try:
+                    result = self._pipeline_service.run_pipeline(pipeline_id, [img.path])
+                except Exception as exc:
+                    failures.append(f"{img.node_id}: {exc}")
+                    continue
+
+                if result.error:
+                    failures.append(f"{img.node_id}: {result.error.code} {result.error.message}")
+                    continue
+
+                saved_path = self._translation_store.save_translated_image(
+                    node_id=img.node_id,
+                    unit_id=unit_id,
+                    original_path=img.path,
+                    output=result.output.get("image"),
+                )
+                if not saved_path:
+                    failures.append(f"{img.node_id}: failed to save translated image")
+                    continue
+
+                translated_ids.append(img.node_id)
+                translation_updates.append((img.node_id, signature, saved_path))
+
+        if translation_updates:
+            self._apply_translation_updates(translation_updates)
 
         return TranslationSummary(
             requested=requested,
@@ -188,10 +200,12 @@ class PageEditorService:
         images: list[ImageSelection] = []
         for node in self._iter_ordered_images(root, selection):
             path = self._resolve_image_path(node)
+            translated_path = self._resolve_translated_path(node)
             images.append(
                 ImageSelection(
                     node_id=node.node_id,
                     path=path,
+                    translated_path=translated_path,
                     pipeline_id=node.settings.get(self.PIPELINE_KEY),
                     last_pipeline_signature=node.settings.get(self.SIGNATURE_KEY),
                 )
@@ -224,17 +238,27 @@ class PageEditorService:
         except Exception:
             return None
 
-    def _update_translation_signatures(self, target_ids: Iterable[str], signature: str) -> None:
+    def _resolve_translated_path(self, node: HierarchyNode) -> Optional[Path]:
+        stored = node.settings.get(self.TRANSLATED_PATH_KEY)
+        if not stored:
+            return None
+        return self._translation_store.resolve_path(stored)
+
+    def _apply_translation_updates(self, updates: Iterable[tuple[str, str, str]]) -> None:
         unit_id = self._require_active_unit()
         root = self._repository.get_hierarchy(unit_id)
-        target_set = set(target_ids)
+        target_set = {node_id for node_id, _, _ in updates}
+        updates_by_id = {node_id: (signature, translated_path) for node_id, signature, translated_path in updates}
 
         def _updater(node: HierarchyNode) -> Optional[dict]:
-            current = node.settings.get(self.SIGNATURE_KEY)
-            if current == signature:
-                return None
             updated = dict(node.settings)
+            signature, translated_path = updates_by_id.get(node.node_id, (None, None))
+            if signature is None:
+                return None
             updated[self.SIGNATURE_KEY] = signature
+            updated[self.TRANSLATED_PATH_KEY] = translated_path
+            if updated == node.settings:
+                return None
             return updated
 
         new_root, changed_ids, changed = self._update_hierarchy(
@@ -314,5 +338,14 @@ class PageEditorService:
 
     def _on_active_unit_changed(self, event: ActiveDocUnitChanged) -> None:
         self._active_unit_id = event.unit_id
+
+    @staticmethod
+    def _translated_file_exists(path: Optional[Path]) -> bool:
+        if not path:
+            return False
+        try:
+            return path.exists()
+        except Exception:
+            return False
 
     # endregion

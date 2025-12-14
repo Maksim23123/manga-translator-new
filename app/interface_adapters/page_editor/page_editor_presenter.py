@@ -19,6 +19,7 @@ class PageEditorView(Protocol):
     def clear_images(self) -> None: ...
     def set_pipeline_choices(self, choices: list[str]) -> None: ...
     def set_pipeline_value(self, value: Optional[str]) -> None: ...
+    def set_view_mode(self, mode: str) -> None: ...
     def set_actions_enabled(self, *, has_active_unit: bool, has_selection: bool) -> None: ...
     def show_error(self, message: str) -> None: ...
 
@@ -32,6 +33,7 @@ class PageEditorPresenter:
         self._controller = None
         self._active_unit_id: Optional[str] = None
         self._selection_ids: list[str] = []
+        self._view_mode: str = "original"
 
         self._doc_unit_events.subscribe(ActiveDocUnitChanged, self._handle_active_unit_changed)
         self._doc_unit_events.subscribe(HierarchySelectionChanged, self._handle_selection_changed)
@@ -45,6 +47,7 @@ class PageEditorPresenter:
         self._controller = controller
         self._controller.set_view(view)
         self._controller.update_selection(self._selection_ids)
+        self._view.set_view_mode(self._view_mode)
         self._refresh_pipeline_choices()
         self._refresh_selection()
 
@@ -53,6 +56,15 @@ class PageEditorPresenter:
 
     def refresh(self) -> None:
         self._refresh_pipeline_choices()
+        self._refresh_selection()
+
+    def set_view_mode(self, mode: str) -> None:
+        normalized = "translated" if str(mode).lower().startswith("t") else "original"
+        if normalized == self._view_mode:
+            return
+        self._view_mode = normalized
+        if self._view:
+            self._view.set_view_mode(self._view_mode)
         self._refresh_selection()
 
     def _handle_active_unit_changed(self, event: ActiveDocUnitChanged) -> None:
@@ -113,15 +125,21 @@ class PageEditorPresenter:
             self._update_actions_state()
             return
 
-        self._view.show_images(self._image_paths(images))
+        self._view.show_images(self._paths_for_view(images))
         self._view.set_pipeline_value(self._common_pipeline(images))
         self._update_actions_state(has_selection=bool(self._selection_ids))
 
-    def _image_paths(self, images: Sequence[ImageSelection]) -> list[str]:
+    def _paths_for_view(self, images: Sequence[ImageSelection]) -> list[str]:
+        prefer_translated = self._view_mode == "translated"
         paths: list[str] = []
         for img in images:
-            if img.path and img.path.exists():
-                paths.append(str(img.path))
+            candidate = None
+            if prefer_translated and img.translated_path and img.translated_path.exists():
+                candidate = img.translated_path
+            elif img.path and img.path.exists():
+                candidate = img.path
+            if candidate:
+                paths.append(str(candidate))
         return paths
 
     def _common_pipeline(self, images: Sequence[ImageSelection]) -> Optional[str]:
