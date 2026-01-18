@@ -5,7 +5,7 @@ from .inpainting_backend import InpainterBackend
 from .text_detection_backend import TextDetectionBackend
 from .text_extraction_backend import TextExtractionBackend
 from .text_insertion_backend import TextInsertionBackend
-from .translation_backend import TranslationBackend
+from .translation_backend import OpenAITranslationBackend, TranslationBackend
 
 __all__ = [
     "Hierarchy",
@@ -15,6 +15,7 @@ __all__ = [
     "TextDetectionBackend",
     "TextExtractionBackend",
     "TextInsertionBackend",
+    "OpenAITranslationBackend",
     "TranslationBackend",
     "copy_image",
     "ImageType",

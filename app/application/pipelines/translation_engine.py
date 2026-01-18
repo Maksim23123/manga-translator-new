@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import logging
 import os
 import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, Optional
@@ -11,6 +13,8 @@ from app.application.pipelines.pipeline_executor import (
     PipelineExecutionResult,
     PipelineExecutor,
 )
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -103,7 +107,10 @@ class TranslationEngine:
             entry = self.ensure_executor(pipeline_id, graph_path, request.executor_params)
             with entry.lock:
                 self._fire_started(pipeline_id, request)
+                run_started = time.perf_counter()
                 result = entry.executor.run(request)
+                run_duration_ms = (time.perf_counter() - run_started) * 1000
+            self._log_run_finished(pipeline_id, result, run_duration_ms)
             self._fire_finished(pipeline_id, result)
             return result
         finally:
@@ -145,6 +152,23 @@ class TranslationEngine:
                 self._callbacks.on_run_finished(pipeline_id, result)
             except Exception:
                 pass
+
+    @staticmethod
+    def _log_run_finished(
+        pipeline_id: str,
+        result: PipelineExecutionResult,
+        run_duration_ms: float,
+    ) -> None:
+        duration_ms = result.diagnostics.duration_ms if result.diagnostics else run_duration_ms
+        if result.error:
+            log.warning(
+                "Pipeline '%s' finished with error in %.1f ms (%s)",
+                pipeline_id,
+                duration_ms,
+                result.error.code,
+            )
+            return
+        log.info("Pipeline '%s' finished in %.1f ms", pipeline_id, duration_ms)
 
     @staticmethod
     def _safe_cleanup(executor: PipelineExecutor) -> None:
