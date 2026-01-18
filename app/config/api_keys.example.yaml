@@ -1,0 +1,4 @@
+api_keys:
+  together_api_key: "YOUR_TOGETHER_API_KEY"
+  inference_api_key: "YOUR_INFERENCE_API_KEY"
+  openai_api_key: "YOUR_OPENAI_API_KEY"

@@ -140,6 +140,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+app/config/api_keys.yaml
 
 # Spyder project settings
 .spyderproject
