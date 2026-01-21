@@ -47,12 +47,16 @@ class MainWindow(QMainWindow):
         main_menu = QMenu(parent=menu_bar, title="File")
         
         new_project_action = QAction(parent=main_menu, text="New Project")
+        new_project_action.setShortcut("Ctrl+N")
         new_project_action.triggered.connect(self._controller.on_new_project_triggered)
         save_project_action = QAction(parent=main_menu, text="Save")
+        save_project_action.setShortcut("Ctrl+S")
         save_project_action.triggered.connect(self._controller.on_save_project_triggered)
         save_project_as_action = QAction(parent=main_menu, text="Save As...")
+        save_project_as_action.setShortcut("Ctrl+Shift+S")
         save_project_as_action.triggered.connect(self._controller.on_save_project_as_triggered)
         load_project_action = QAction(parent=main_menu, text="Load")
+        load_project_action.setShortcut("Ctrl+O")
         load_project_action.triggered.connect(self._controller.on_load_project_triggered)
         
         main_menu.addActions([
